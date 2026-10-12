@@ -10,6 +10,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ENGINES } from './engines.js';
 import { countBucket, createTelemetry, durationBucket } from './telemetry.js';
+import { doctor, formatDoctor } from './doctor.js';
 import { renderPrompt, renderCodexPrompt, promptHash, laneTokens } from './prompt.js';
 import { checkout } from './github.js';
 import { runRound } from './run.js';
@@ -20,7 +21,9 @@ const USAGE = `usage:
   assayer review <owner/repo#N | PR URL> [--engine codex] [--model M] [--post] [--again]
                  [--ignore-repo-config] [--out DIR]
   assayer publish <round dir>
-  assayer telemetry on|off|status`;
+  assayer telemetry on|off|status
+  assayer doctor
+  assayer --version`;
 
 
 export function parseTarget(s) {
@@ -31,6 +34,7 @@ export function parseTarget(s) {
 
 export function parseArgs(argv) {
   const [cmd, target, ...rest] = argv;
+  if ((cmd === 'doctor' || cmd === '--version') && target === undefined) return { cmd };
   if (cmd === 'telemetry') {
     if (!['on', 'off', 'status'].includes(target) || rest.length) throw new Error(USAGE);
     return { cmd, action: target };
@@ -230,6 +234,8 @@ if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.me
   let o;
   try { o = parseArgs(process.argv.slice(2)); } catch (e) { process.stderr.write(`${e.message}\n`); process.exit(2); }
   const { version } = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+  if (o.cmd === '--version') { process.stdout.write(`${version}\n`); process.exit(0); }
+  if (o.cmd === 'doctor') { const d = doctor(); process.stdout.write(formatDoctor(d) + '\n'); process.exit(d.ok ? 0 : 1); }
   const tel = createTelemetry({ version });
   if (o.cmd === 'telemetry') {
     if (o.action !== 'status') tel.set(o.action === 'on');

@@ -9,6 +9,7 @@ const BASE_ENV = ['PATH', 'HOME', 'LANG', 'TERM', 'TMPDIR', 'NODE_OPTIONS'];
 export const ENGINES = Object.freeze({
   opencode: {
     command: 'opencode',
+    cli: 'opencode',
     // --pure: no user plugins or global config; --cwd pins the project. Mirrors the prismalens
     // registry row that passed the #561 admission run.
     args: ({ cwd }) => ['acp', '--pure', '--cwd', cwd],
@@ -47,6 +48,7 @@ export const ENGINES = Object.freeze({
     // @zed-industries/codex-acp 0.16.0 is deprecated: its old core is refused gpt-6.1 on a
     // ChatGPT login, and its only refusal aborts the turn.
     command: 'codex-acp',
+    cli: 'codex',
     args: () => [],
     envAllow: [...BASE_ENV, 'GH_TOKEN', 'GITHUB_TOKEN', 'CODEX_HOME', 'OPENAI_API_KEY', 'CODEX_API_KEY'],
     credentialKinds: ['api-key', 'user-login'],
@@ -68,6 +70,7 @@ export const ENGINES = Object.freeze({
   },
   'claude-code': {
     command: 'claude-agent-acp',
+    cli: 'claude',
     args: () => [],
     envAllow: [...BASE_ENV, 'GH_TOKEN', 'GITHUB_TOKEN', 'ANTHROPIC_API_KEY', 'ANTHROPIC_BASE_URL', 'ANTHROPIC_AUTH_TOKEN',
       'ANTHROPIC_MODEL', 'CLAUDE_CONFIG_DIR', 'CLAUDE_CODE_EXECUTABLE', 'CLAUDE_CODE_DISABLE_BACKGROUND_TASKS',

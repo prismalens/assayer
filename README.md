@@ -15,6 +15,8 @@ gh auth login
 
 After the first release the first two lines become `npm i -g @prismalens/assayer`. Either way you need Node 24 or newer, `git`, `python3`, `gh` and one engine signed in.
 
+`assayer doctor` checks what this machine has for a round: Node, git, python3, gh and its sign-in, and which engines are installed.
+
 ## Review a pull request
 
 ```bash
