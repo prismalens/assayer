@@ -7,7 +7,7 @@ import path from 'node:path';
 import { snapshot, chooseBase, localCheckout, changedFiles, sameTree } from '../src/local.js';
 import { buildManifest } from '../src/manifest.js';
 import { renderCodexPrompt } from '../src/prompt.js';
-import { parseArgs, severityOf, atOrAbove, publish } from '../src/review.js';
+import { parseArgs, severityOf, atOrAbove, publish, findingLines } from '../src/review.js';
 import { sanitize } from '../src/telemetry.js';
 
 const tmp = () => mkdtempSync(path.join(os.tmpdir(), 'assayer-local-'));
@@ -150,5 +150,11 @@ describe('local prompt and CLI', () => {
   it('sends the round mode and the new refusals, nothing else', () => {
     assert.deepEqual(sanitize({ mode: 'local', reason: 'no_changes', path: '/home/x' }), { mode: 'local', reason: 'no_changes' });
     assert.deepEqual(sanitize({ mode: 'branch' }), {});
+  });
+
+  it('prints findings most severe first, keeping filing order within a severity', () => {
+    const f = (sev, p, t) => ({ path: p, line: 1, body: `_🎯 Functional Correctness_ | _${sev}_ | _⚡ Quick win_\n<details></details>\n**${t}**` });
+    const out = findingLines([f('🟡 Minor', 'a', 'one'), f('🔴 Critical', 'b', 'two'), f('🟠 Major', 'c', 'three'), f('🔴 Critical', 'd', 'four')]);
+    assert.deepEqual(out.map((l) => l.trim().split('  ')[1]), ['two', 'four', 'three', 'one']);
   });
 });

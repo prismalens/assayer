@@ -19,6 +19,7 @@ import { changedFiles, chooseBase, localCheckout, refusal as localRefusal, repoT
 
 export { severityOf };
 import { hookCommand } from './hook.js';
+import { startProgress } from './progress.js';
 import { KEYS, formatSettings, readSettings, resolveDefaults, settingsFile, writeSetting } from './settings.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -230,16 +231,23 @@ export function readFindings(dir) {
   return { events, findings: events.filter((e) => e.type === 'finding') };
 }
 
+// Most severe first; the engine's filing order breaks ties.
+export function findingLines(findings) {
+  return findings
+    .map((f, i) => ({ f, i, sev: severityOf(f.body) }))
+    .sort((a, b) => SEVERITIES.indexOf(a.sev) - SEVERITIES.indexOf(b.sev) || a.i - b.i)
+    .map(({ f, sev }) => {
+      const after = f.body.slice(f.body.indexOf('</details>') + 1);
+      const title = (/\*\*(.+?)\*\*/.exec(after)?.[1] ?? f.body.split('\n')[0]).slice(0, 140);
+      return `  [${sev[0].toUpperCase()}${sev.slice(1)}] ${f.path}:${f.line ?? '?'}  ${title}`;
+    });
+}
+
 function printRound(dir) {
   const s = JSON.parse(readFileSync(path.join(dir, 'summary.json'), 'utf8'));
   const { events, findings } = readFindings(dir);
   const lines = [`${s.conclusion}: ${s.findings ?? 0} finding(s) in ${Math.round((s.wall_clock_ms ?? 0) / 1000)}s`];
-  for (const f of findings) {
-    const after = f.body.slice(f.body.indexOf('</details>') + 1);
-    const title = (/\*\*(.+?)\*\*/.exec(after)?.[1] ?? f.body.split('\n')[0]).slice(0, 140);
-    const sev = severityOf(f.body);
-    lines.push(`  [${sev[0].toUpperCase()}${sev.slice(1)}] ${f.path}:${f.line ?? '?'}  ${title}`);
-  }
+  lines.push(...findingLines(findings));
   const summary = events.findLast((e) => e.type === 'summary');
   if (summary) lines.push('', summary.body);
   process.stdout.write(lines.join('\n') + '\n');
@@ -261,6 +269,12 @@ async function pickEngine() {
 }
 
 const LABELS = { codex: 'Codex', 'claude-code': 'Claude Code', opencode: 'OpenCode' };
+
+// The live view stops before the round's own closing line, so the two never share a row.
+async function watched(dir, engine, log, run) {
+  const view = startProgress(dir, { engine });
+  try { return await run((s) => { view.stop(); log(s); }); } finally { view.stop(); }
+}
 
 // A refusal before any quota is spent; telemetry sends its kind, never the message.
 const refusal = (reason, message) => Object.assign(new Error(message), { refusal: reason });
@@ -292,12 +306,12 @@ export async function reviewLocal(o, { log = (s) => process.stderr.write(s + '\n
   const round = { mode: 'local', repository: null, pr_number: null, local_path: top, head_sha: snap.head, head_tree: snap.tree, base_sha: base.sha, base_source: base.source, dirty: snap.dirty, engine: o.engine, model: o.model, where: 'local' };
   writeFileSync(path.join(dir, 'round.json'), JSON.stringify(round, null, 2) + '\n');
   log(`assayer: local changes in ${label}, ${snap.dirty ? 'working tree' : snap.head.slice(0, 7)} vs ${base.sha.slice(0, 7)} from ${base.source}, with ${o.engine}; round in ${dir}`);
-  const summary = await runRound({
+  const summary = await watched(dir, o.engine, log, (log) => runRound({
     cwd: checkoutDir, prompt: path.join(dir, 'prompt.md'), out: dir, engine: o.engine, model: o.model, promptHash: prompt.hash,
     stage: true, repo, pr: '0', headSha: snap.head, baseSha: base.sha, mode: 'review', ghToken: '', engineGh: 'offline',
     localFiles: changedFiles(checkoutDir, base.sha, snap.head),
     timeoutMs: (ENGINES[o.engine].timeoutMin ?? 20) * 60 * 1000, idleMs: (ENGINES[o.engine].idleMin ?? 8) * 60 * 1000,
-  }, { log });
+  }, { log }));
   printRound(dir);
   const { findings } = readFindings(dir);
   const counts = Object.fromEntries(SEVERITIES.map((x) => [x, findings.filter((f) => severityOf(f.body) === x).length]));
@@ -336,11 +350,11 @@ export async function review(o, { log = (s) => process.stderr.write(s + '\n') } 
   const round = { repository: o.repo, pr_number: o.pr, head_sha: headSha, base_sha: baseSha, engine: o.engine, model: o.model, where: 'local' };
   writeFileSync(path.join(dir, 'round.json'), JSON.stringify(round, null, 2) + '\n');
 
-  const summary = await runRound({
+  const summary = await watched(dir, o.engine, log, (log) => runRound({
     cwd, prompt: path.join(dir, 'prompt.md'), out: dir, engine: o.engine, model: o.model, promptHash: prompt.hash,
     stage: true, repo: o.repo, pr: String(o.pr), headSha, mode: 'review', ghToken: token, engineGh: 'offline',
     timeoutMs: (ENGINES[o.engine].timeoutMin ?? 20) * 60 * 1000, idleMs: (ENGINES[o.engine].idleMin ?? 8) * 60 * 1000,
-  }, { log });
+  }, { log }));
   printRound(dir);
   if (summary.conclusion !== 'completed') return { dir, summary, posted: null };
   if (!o.post) { log(`assayer: not posted; run \`assayer publish ${dir}\` to post it`); return { dir, summary, posted: null }; }
