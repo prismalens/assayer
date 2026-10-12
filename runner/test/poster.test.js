@@ -243,3 +243,9 @@ describe("poster (#184)", () => {
     assert.equal(looksLikeSecret("sk-ant-" + "x".repeat(30)), true);
   });
 });
+
+it('an engine credit line at the end of a summary is left out of the post', async () => {
+  const { withoutEngineCredit } = await import('../src/poster.js');
+  assert.equal(withoutEngineCredit('## Code review\nFound 3.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)'), '## Code review\nFound 3.');
+  assert.equal(withoutEngineCredit('## Code review\n🤖 Generated with care, says the author.'), '## Code review\n🤖 Generated with care, says the author.');
+});

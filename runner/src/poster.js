@@ -133,6 +133,12 @@ export async function upsertLiveness({ fetch: fetchImpl, token, appLogin, reposi
 // Every comment a round posts ends in the engine marker, so a caller stub can divert it from the
 // pull request's concurrency group whoever posted it (OBJ-020). `engineDropped` counts findings
 // the runner itself discarded before they became events (OBJ-005).
+// An engine's own "generated with" credit is not part of the review; the marker says whose it is.
+// Claude Code appended one to a real summary despite its attribution setting.
+export function withoutEngineCredit(body) {
+  return body.replace(/\n+\s*🤖 Generated with \[[^\]]+\]\([^)]*\)\s*$/u, '').trimEnd();
+}
+
 export async function postRound({ fetch: fetchImpl, token, appLogin, job, events, rounds, journal = null, skipLiveness = false, livenessStillCurrent = null, engineLiveness = false, engineDropped = 0 }) {
   const out = { inline: 0, refused: 0, summary: 0, unplaced: 0 };
   const unplaced = [];
@@ -191,7 +197,7 @@ export async function postRound({ fetch: fetchImpl, token, appLogin, job, events
       break;
     }
   }
-  const summaryBody = summary && typeof summary.body === "string" && summary.body.trim() && !looksLikeSecret(summary.body) ? summary.body : null;
+  const summaryBody = summary && typeof summary.body === "string" && summary.body.trim() && !looksLikeSecret(summary.body) ? withoutEngineCredit(summary.body) : null;
   if (summaryBody && journal?.has("summary")) {
     out.summary = 1;
   } else if (summaryBody) {

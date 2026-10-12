@@ -93,7 +93,7 @@ export const ENGINES = Object.freeze({
     // No user settings, hooks, plugins or CLAUDE.md, and no reads outside the checkout. The adapter
     // starts in the user's own defaultMode ("auto" ran shell unasked), so the round sets Always ask
     // and every gated call reaches the policy (planner ruling, run-plan 2026-10-13).
-    sessionMeta: { claudeCode: { options: { settingSources: [], strictMcpConfig: true, settings: { permissions: { blockReadsOutsideWorkingDirectories: true } } } } },
+    sessionMeta: { claudeCode: { options: { settingSources: [], strictMcpConfig: true, settings: { permissions: { blockReadsOutsideWorkingDirectories: true }, attribution: { commit: '', pr: '' }, includeCoAuthoredBy: false } } } },
     sessionMode: 'default',
     prepare({ model, env }) {
       return { ...env, CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: '1', ...(model ? { ANTHROPIC_MODEL: model } : {}) };

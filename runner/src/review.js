@@ -14,7 +14,7 @@ import { doctor, formatDoctor } from './doctor.js';
 import { renderPrompt, renderCodexPrompt, promptHash, laneTokens } from './prompt.js';
 import { checkout } from './github.js';
 import { runRound } from './run.js';
-import { LIVENESS_PREFIX, postRound } from './poster.js';
+import { LIVENESS_PREFIX, postRound, withoutEngineCredit } from './poster.js';
 import { changedFiles, chooseBase, localCheckout, refusal as localRefusal, repoTop, sameTree, severityOf, snapshot, git as localGit } from './local.js';
 
 export { severityOf };
@@ -299,7 +299,7 @@ function printRound(dir) {
   const lines = [`${s.conclusion}: ${s.findings ?? 0} finding(s) in ${Math.round((s.wall_clock_ms ?? 0) / 1000)}s`];
   lines.push(...findingLines(findings));
   const summary = events.findLast((e) => e.type === 'summary');
-  if (summary) lines.push('', summary.body);
+  if (summary) lines.push('', withoutEngineCredit(summary.body));
   process.stdout.write(lines.join('\n') + '\n');
 }
 
