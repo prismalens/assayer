@@ -71,9 +71,9 @@ It refuses before spending any quota when the pull request is closed, carries th
 
 | Engine | Install | Sign-in |
 | --- | --- | --- |
-| Codex (default) | `npm i -g @openai/codex @agentclientprotocol/codex-acp` | `codex login`, or `OPENAI_API_KEY` |
-| Claude Code | `npm i -g @anthropic-ai/claude-code @agentclientprotocol/claude-agent-acp` | `claude` sign-in, or `ANTHROPIC_API_KEY` |
-| OpenCode | `npm i -g opencode-ai` | none needed for its free models |
+| Codex (default) | `npm i -g @openai/codex @agentclientprotocol/codex-acp@2.1.1` | `codex login`, or `OPENAI_API_KEY` |
+| Claude Code | `npm i -g @anthropic-ai/claude-code @agentclientprotocol/claude-agent-acp@0.89.1` | run `claude` and type `/login`, or `ANTHROPIC_API_KEY` |
+| OpenCode | `npm i -g opencode-ai@1.18.30` | none needed for its free models |
 
 Use whichever sign-in your plan offers. Each provider's own terms apply: [OpenAI](https://openai.com/policies/), [Anthropic](https://www.anthropic.com/legal), [OpenCode](https://opencode.ai). `assayer doctor` shows which engines are ready on this machine.
 
@@ -92,11 +92,11 @@ The first `assayer` run in a terminal prints a notice and sends nothing. Later r
 | --- | --- |
 | `install_active` | at most once a UTC day |
 | `round_finished` | `pr` or `local`, engine, conclusion, findings bucket (`0`, `1`, `2-5`, `6-20`, `>20`), duration bucket, whether it was posted |
-| `refused` | `pr` or `local`, engine, and which refusal: `closed`, `skip_label`, `already_reviewed`, `repo_config`, `no_base`, `no_changes` |
+| `refused` | `pr` or `local`, engine, and which refusal: `closed`, `skip_label`, `already_reviewed`, `repo_config`, `no_base`, `no_changes`, `no_repo` |
 
 Every event also carries `product`, how it was installed (`npm` or `checkout`), OS, CPU architecture, Node major version, the Assayer version, and a random install id kept in `~/.assayer/telemetry.json`. Timestamps are cut to the UTC day, and IP geolocation is turned off. Assayer never sends repository names, paths, logins, code, prompts, findings or model output.
 
-`assayer telemetry off` turns it off, and `assayer telemetry status` shows the last 20 events sent. `ASSAYER_TELEMETRY=off`, `DO_NOT_TRACK=1` and `CI` each turn it off whatever the stored answer, and a run with no terminal never shows the notice, so it never starts.
+`assayer telemetry off` turns it off, `assayer telemetry on` back on, and `assayer telemetry status` shows the last 20 events sent. `ASSAYER_TELEMETRY=off`, `DO_NOT_TRACK=1` and `CI` each turn it off whatever the stored answer, and a run with no terminal never shows the notice, so it never starts.
 
 ## Known limits
 

@@ -31,4 +31,4 @@ Assayer does not yet re-check its own threads on a later round. Reply in a threa
 
 ## Whose name is on it
 
-A local round posts under the `gh` login that ran it. There is no shared bot account. A finding is recognised as Assayer's by its marker, not by who posted it.
+A round posts under the `gh` login that ran it. There is no shared bot account. A finding is recognised as Assayer's by its marker, not by who posted it.

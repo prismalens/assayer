@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { readSettings, resolveDefaults, writeSetting } from '../src/settings.js';
@@ -69,5 +69,21 @@ describe('ASSAYER_HOME', () => {
     const { assayerHome } = await import('../src/settings.js');
     assert.equal(assayerHome({ ASSAYER_HOME: '/x/state' }), '/x/state');
     assert.equal(assayerHome({}), path.join(os.homedir(), '.assayer'));
+  });
+});
+
+describe('PR reviews and kept rounds', () => {
+  it('a PR review takes --fail-on, and the saved fail-on too', async () => {
+    assert.equal(parseArgs(['review', 'a/b#1', '--fail-on', 'major']).failOn, 'major');
+    assert.throws(() => parseArgs(['review', 'a/b#1', '--fail-on', 'loud']), /--fail-on takes/);
+    assert.equal((await resolveDefaults(parseArgs(['review', 'a/b#1', '--engine', 'codex']), { settings: { 'fail-on': 'critical' }, isTTY: false, ...quiet })).failOn, 'critical');
+  });
+
+  it('publish finds a bare round name among the kept rounds', async () => {
+    const { roundDir } = await import('../src/review.js');
+    const home = mkdtempSync(path.join(os.tmpdir(), 'assayer-home-'));
+    mkdirSync(path.join(home, 'reviews', 'o-r-1-abc-1'), { recursive: true });
+    assert.equal(roundDir('o-r-1-abc-1', home), path.join(home, 'reviews', 'o-r-1-abc-1'));
+    assert.equal(roundDir('/abs/elsewhere', home), '/abs/elsewhere');
   });
 });

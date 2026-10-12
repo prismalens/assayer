@@ -16,7 +16,7 @@ const RECENT_MAX = 20;
 
 export const RUN_MODES = ['npm', 'checkout'];
 export const CONCLUSIONS = ['completed', 'failed', 'refused', 'cancelled'];
-export const REFUSALS = ['closed', 'skip_label', 'already_reviewed', 'repo_config', 'no_base', 'no_changes'];
+export const REFUSALS = ['closed', 'skip_label', 'already_reviewed', 'repo_config', 'no_base', 'no_changes', 'no_repo'];
 export const COUNT_BUCKETS = ['0', '1', '2-5', '6-20', '>20'];
 export const DURATION_BUCKETS = ['<1m', '1-5m', '5-15m', '>15m'];
 

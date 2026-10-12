@@ -14,7 +14,7 @@ the environment, or none for OpenCode's free models.
 `assayer review owner/repo#N` runs one round on this machine with your own engine sign-in and
 prints the findings. `--post` puts them on the pull request under your own `gh` login, each
 inline finding ending in the `assayer-finding` marker; `assayer publish <dir>` posts, or resumes
-posting, a round that already ran. Nothing is hosted: a local round posts as you (#184).
+posting, a round that already ran. Nothing is hosted: a round run on your machine posts as you (#184).
 
 ```bash
 # once, from a checkout of this repository
@@ -41,7 +41,7 @@ workflow defaults). The round lives in `~/.assayer/reviews/<repo>-<pr>-<sha>-<ti
 ```bash
 cd runner && npm ci
 node src/run.js --cwd /path/to/checkout --prompt rendered-prompt.md --out ./round-1 \
-  --engine opencode --model opencode/mimo-v2.5-free
+  --engine opencode
 ```
 
 `--cwd` must be a git checkout at the PR head. `--prompt` is the lane template already rendered.
@@ -54,8 +54,8 @@ has the template's provenance and re-sync rule. A file still carrying `@@TOKEN@@
 `src/engines.js`; `--model` defaults to the row's `defaultModel`, for OpenCode the newest free
 tool-calling model in the models.dev catalog (`opencode models opencode` lists them; the free
 tier needs no key or login). `--timeout-min` (default 20) bounds the round and `--idle-min` (default 8) cuts an engine that has sent no update for that long; either cancels the session, then kills the engine if it does not stop.
-`GH_TOKEN` in the environment is passed through to the engine for the `gh` read commands the
-prompt allows.
+Under `assayer review` the engine gets no `GH_TOKEN` or `GITHUB_TOKEN` and an empty `GH_CONFIG_DIR`,
+so its `gh` reads fail closed and only Assayer posts.
 
 Staging never executes a binary the checkout brought with it: a committed `./actionlint` or
 `node_modules/.bin/*` is skipped and the skip is recorded in the manifest's tool notes, since
@@ -80,7 +80,7 @@ The output directory holds:
 | `summary.json` | conclusion, stop reason, turns, tool calls, reads, findings, permissions allowed and rejected, usage, errors, dropped items, wall clock |
 | `engine-stderr.log`, `engine-config/`, `engine-xdg/` | the engine's own noise and the per-run config the runner wrote for it |
 
-Exit code 0 is `completed`, 3 an engine error, 4 a timeout, 2 bad usage.
+`run.js` exits 0 for `completed`, 3 for an engine error, 4 for a timeout and 2 for bad usage. `assayer review` exits 0 when the round completed, 3 when it did not, 4 when `--fail-on` found something at or above its level, 1 on a refusal and 2 on bad usage.
 
 ## What the pieces are
 
@@ -133,7 +133,7 @@ default is a workspace-write mode with an automatic reviewer. Every command runs
 own sandbox, with no writes and no network, and does not ask. A command that needs out asks, and
 the policy answers. Codex's permission request quotes such a script into one word, and the
 summary arrives as `gh pr comment --body "<lines>"`. The policy accepts a multi-line body only
-inside single quotes, or inside double quotes holding no `"`, `$`, backtick or backslash. A body
+inside single quotes, or inside double quotes whose only backslashes escape a backtick or `$`. A body
 outside that is refused, and since Codex offers only `cancel` for that request and for every
 edit, a refusal ends the round as `cancelled`, not `completed`. The probe's edit step therefore
 ends its Codex run early. Nothing lands. The row also turns off the user's Codex plugins, web

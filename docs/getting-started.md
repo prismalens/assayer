@@ -61,10 +61,14 @@ The hook never starts a review. It looks for a finished local round covering wha
 | `--again` | Review a head this engine already reviewed. |
 | `--ignore-repo-config` | Review a repository that has `.github/claude-review.yml` with the defaults. |
 | `--out DIR` | Keep the round in a new directory of your choosing. |
+| `--fail-on critical\|major\|minor` | Exit 4 when a finding is at or above that severity, for CI and the pre-push habit. |
+| `--base REF`, `--head REV` | Local review only: what to compare against, and a commit to review instead of the working tree. |
+
+A pull request can be named as `owner/repo#123` or by its URL. `assayer publish` takes the round's directory or just its name as `review` printed it. `assayer hook uninstall` removes the hook, and `assayer telemetry on` turns telemetry back on.
 
 ## Defaults
 
-The first review on a terminal with no `--engine` asks which installed engine to use and saves the answer to `~/.assayer/config.json`. Without a terminal, in CI or a script, it never asks and uses Codex.
+The first review on a terminal with no `--engine` asks which engine to use, offers to install it if it is missing, and saves the answer to `~/.assayer/config.json`. Without a terminal, in CI or a script, it never asks and uses Codex.
 
 ```bash
 assayer config                          # show the defaults

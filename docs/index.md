@@ -17,7 +17,7 @@ assayer review owner/repo#123 --post    # post the findings as you
 ```
 
 - [Getting started](getting-started.md): install, sign in, first round.
-- [How it works](how-it-works.md): what a round reads, what it posts, and how it closes its own threads.
+- [How it works](how-it-works.md): what a round reads, what it can read, and what it posts.
 - [Engines](engines.md): Codex, Claude Code and OpenCode.
 - [Claude Code and Codex](agents.md): the plugin that lets an agent run Assayer for you.
 - [Telemetry](telemetry.md): exactly what is sent, and how to turn it off.

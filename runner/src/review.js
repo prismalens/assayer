@@ -25,13 +25,13 @@ import { KEYS, assayerHome, formatSettings, readSettings, resolveDefaults, write
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const USAGE = `usage:
   assayer review <owner/repo#N | PR URL> [--engine E] [--model M] [--post] [--again]
-                 [--ignore-repo-config] [--out DIR]
+                 [--fail-on critical|major|minor] [--ignore-repo-config] [--out DIR]
   assayer review [--base REF] [--head REV] [--engine E] [--model M]
                  [--fail-on critical|major|minor] [--ignore-repo-config] [--out DIR]
                                                          reviews local changes, prints only
   assayer config [set <key> <value> | unset <key>]       engine, model, fail-on defaults
   assayer hook install|uninstall
-  assayer publish <round dir>
+  assayer publish <round dir or name>
   assayer telemetry on|off|status
   assayer doctor
   assayer --version`;
@@ -66,7 +66,7 @@ export function parseArgs(argv) {
   }
   if (cmd === 'review' && (target === undefined || target.startsWith('--'))) return parseLocal(target === undefined ? [] : [target, ...rest]);
   if (cmd !== 'review' || !target) throw new Error(USAGE);
-  const o = { cmd, ...parseTarget(target), engine: null, model: null, post: false, again: false, ignoreRepoConfig: false, out: null };
+  const o = { cmd, ...parseTarget(target), engine: null, model: null, post: false, again: false, ignoreRepoConfig: false, out: null, failOn: null };
   for (let i = 0; i < rest.length; i += 1) {
     const a = rest[i];
     const need = () => { const v = rest[i + 1]; if (v === undefined) throw new Error(`${a} needs a value`); i += 1; return v; };
@@ -76,9 +76,11 @@ export function parseArgs(argv) {
     else if (a === '--again') o.again = true;
     else if (a === '--ignore-repo-config') o.ignoreRepoConfig = true;
     else if (a === '--out') o.out = need();
+    else if (a === '--fail-on') o.failOn = need();
     else throw new Error(`unknown argument ${a}\n${USAGE}`);
   }
   checkEngine(o.engine);
+  if (o.failOn !== null && !SEVERITIES.includes(o.failOn)) throw new Error(`--fail-on takes ${SEVERITIES.join(', ')}`);
   return o;
 }
 
@@ -298,6 +300,12 @@ async function ensureEngine(engine, interactive) {
   if (!ok) throw new Error(`${LABELS[engine]} is not set up; \`assayer doctor\` lists what is missing`);
 }
 
+// A bare round name, as review prints it, is looked up among the kept rounds.
+export function roundDir(arg, home = assayerHome()) {
+  const kept = path.join(home, 'reviews', arg);
+  return !existsSync(path.resolve(arg)) && !arg.includes(path.sep) && existsSync(kept) ? kept : path.resolve(arg);
+}
+
 // The live view stops before the round's own closing line, so the two never share a row.
 async function watched(dir, engine, log, run) {
   const view = startProgress(dir, { engine });
@@ -386,8 +394,9 @@ export async function review(o, { log = (s) => process.stderr.write(s + '\n') } 
   }, { log }));
   printRound(dir);
   if (summary.conclusion !== 'completed') return { dir, summary, posted: null };
-  if (!o.post) { log(`assayer: not posted; run \`assayer publish ${dir}\` to post it`); return { dir, summary, posted: null }; }
-  return { dir, summary, posted: await publish(dir, { log, token }) };
+  const blocking = atOrAbove(readFindings(dir).findings, o.failOn);
+  if (!o.post) { log(`assayer: not posted; run \`assayer publish ${path.basename(dir)}\` to post it`); return { dir, summary, posted: null, blocking }; }
+  return { dir, summary, posted: await publish(dir, { log, token }), blocking };
 }
 
 if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {
@@ -424,7 +433,7 @@ if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.me
   const t0 = Date.now();
   const mode = o.local ? 'local' : 'pr';
   const run = o.cmd === 'publish'
-    ? publish(path.resolve(o.dir)).then(() => 0)
+    ? publish(roundDir(o.dir)).then(() => 0)
     : (o.local ? reviewLocal(o) : review(o)).then((r) => {
       tel.capture('round_finished', { mode, engine: o.engine, conclusion: r.summary.conclusion, findings: countBucket(r.summary.findings), duration_bucket: durationBucket(Date.now() - t0), posted: r.posted !== null });
       if (r.summary.conclusion !== 'completed') return 3;

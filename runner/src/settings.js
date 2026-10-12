@@ -59,7 +59,7 @@ export async function resolveDefaults(o, { settings, isTTY, pick, save, log }) {
       log(`assayer: ${r.engine} is now your default engine; change it with \`assayer config set engine <name>\`, or pass --engine for one round`);
     } else r.engine = DEFAULT_ENGINE;
   }
-  if (r.local && r.failOn === null && settings['fail-on']) r.failOn = settings['fail-on'];
+  if (r.failOn === null && settings['fail-on']) r.failOn = settings['fail-on'];
   return r;
 }
 
