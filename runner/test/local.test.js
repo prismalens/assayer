@@ -7,7 +7,7 @@ import path from 'node:path';
 import { snapshot, chooseBase, localCheckout, changedFiles, sameTree } from '../src/local.js';
 import { buildManifest } from '../src/manifest.js';
 import { renderCodexPrompt } from '../src/prompt.js';
-import { parseArgs, severityOf, atOrAbove, publish, findingLines } from '../src/review.js';
+import { parseArgs, severityOf, atOrAbove, publish, findingLines, failureLines } from '../src/review.js';
 import { sanitize } from '../src/telemetry.js';
 
 const tmp = () => mkdtempSync(path.join(os.tmpdir(), 'assayer-local-'));
@@ -71,7 +71,7 @@ describe('local mode', () => {
   it('chooses the upstream merge base, honours --base, and refuses when there is none', () => {
     const { origin, work } = fixture();
     assert.deepEqual(chooseBase(work), { sha: g(origin, 'rev-parse', 'HEAD'), source: 'upstream' });
-    assert.equal(chooseBase(work, { base: 'HEAD' }).source, 'flag');
+    assert.equal(chooseBase(work, { base: 'HEAD' }).source, '--base HEAD');
     assert.throws(() => chooseBase(origin), (e) => e.refusal === 'no_base');
     assert.throws(() => chooseBase(work, { base: 'nope' }), (e) => e.refusal === 'no_base');
   });
@@ -168,5 +168,12 @@ describe('local prompt and CLI', () => {
     const f = (sev, p, t) => ({ path: p, line: 1, body: `_🎯 Functional Correctness_ | _${sev}_ | _⚡ Quick win_\n<details></details>\n**${t}**` });
     const out = findingLines([f('🟡 Minor', 'a', 'one'), f('🔴 Critical', 'b', 'two'), f('🟠 Major', 'c', 'three'), f('🔴 Critical', 'd', 'four')]);
     assert.deepEqual(out.map((l) => l.trim().split('  ')[1]), ['two', 'four', 'three', 'one']);
+  });
+
+  it('says why a round failed and what to do about it', () => {
+    const lines = failureLines({ engine: 'codex', conclusion: 'failed', errors: [{ failure_class: 'auth-failed', message: 'Authentication required' }] });
+    assert.deepEqual(lines, ['  auth-failed: Authentication required\n  -> sign in to codex once: run `codex login`']);
+    assert.match(failureLines({ engine: 'opencode', conclusion: 'timed-out', timed_out_by: 'idle', errors: [] })[0], /went quiet.*idle/);
+    assert.match(failureLines({ engine: 'codex', conclusion: 'failed', errors: [] })[0], /no reason recorded/);
   });
 });

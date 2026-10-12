@@ -244,9 +244,28 @@ export function findingLines(findings) {
     });
 }
 
+// Why a round did not complete, in words a first-time user can act on.
+export function failureLines(s) {
+  const hint = {
+    'auth-failed': ENGINES[s.engine]?.install?.signIn ? `sign in to ${s.engine} once: ${ENGINES[s.engine].install.signIn}` : null,
+    'rate-limited': 'the engine hit its usage limit; try again after it resets',
+    'account-limit': 'the engine account hit its plan limit',
+    billing: 'the engine account needs billing set up',
+    'model-unavailable': 'the model is not available to this account; pass --model or `assayer config set model <name>`',
+  };
+  const out = (s.errors ?? []).map((e) => `  ${e.failure_class}: ${String(e.message).split('\n')[0].slice(0, 200)}${e.reset_at ? ` (resets ${e.reset_at})` : ''}${hint[e.failure_class] ? `\n  -> ${hint[e.failure_class]}` : ''}`);
+  if (s.conclusion === 'timed-out') out.push(`  the engine went quiet or ran past its time limit (${s.timed_out_by ?? 'timeout'})`);
+  if (!out.length && s.conclusion !== 'completed') out.push(`  no reason recorded; the engine's own log is ${path.join('<round dir>', 'engine-stderr.log')}`);
+  return out;
+}
+
 function printRound(dir) {
   const s = JSON.parse(readFileSync(path.join(dir, 'summary.json'), 'utf8'));
   const { events, findings } = readFindings(dir);
+  if (s.conclusion !== 'completed') {
+    process.stdout.write([`${s.conclusion}: the round did not finish`, ...failureLines(s)].join('\n') + '\n');
+    return;
+  }
   const lines = [`${s.conclusion}: ${s.findings ?? 0} finding(s) in ${Math.round((s.wall_clock_ms ?? 0) / 1000)}s`];
   lines.push(...findingLines(findings));
   const summary = events.findLast((e) => e.type === 'summary');
@@ -323,6 +342,7 @@ export async function reviewLocal(o, { log = (s) => process.stderr.write(s + '\n
     timeoutMs: (ENGINES[o.engine].timeoutMin ?? 20) * 60 * 1000, idleMs: (ENGINES[o.engine].idleMin ?? 8) * 60 * 1000,
   }, { log }));
   printRound(dir);
+  if (summary.conclusion !== 'completed') return { dir, summary, posted: null, blocking: false };
   const { findings } = readFindings(dir);
   const counts = Object.fromEntries(SEVERITIES.map((x) => [x, findings.filter((f) => severityOf(f.body) === x).length]));
   log(`assayer: ${findings.length} finding(s) (${counts.critical} critical, ${counts.major} major, ${counts.minor} minor), ${snap.dirty ? `working tree on ${localGit(top, ['rev-parse', '--short', 'HEAD'])}` : snap.head.slice(0, 7)} vs ${base.sha.slice(0, 7)} from ${base.source}; round in ${dir}`);

@@ -51,7 +51,7 @@ export function chooseBase(top, { base = null } = {}) {
   if (base) {
     const sha = git(top, ['rev-parse', '--verify', '-q', `${base}^{commit}`], { allowFail: true });
     if (!sha) throw refusal('no_base', `--base ${base} is not a commit here`);
-    return { sha, source: 'flag' };
+    return { sha, source: `--base ${base}` };
   }
   const branch = git(top, ['symbolic-ref', '-q', '--short', 'HEAD'], { allowFail: true });
   const tries = [['upstream', '@{upstream}'], ['origin', 'refs/remotes/origin/HEAD'], ['main', 'refs/heads/main'], ['master', 'refs/heads/master']];
