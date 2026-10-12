@@ -9,7 +9,7 @@ Status: alpha. Install is from a checkout until the first npm release.
 ```bash
 git clone https://github.com/prismalens/assayer && cd assayer
 (cd worker && npm ci --omit=dev) && cd runner && npm ci && npm link
-npm i -g @agentclientprotocol/codex-acp@2.1.1 && codex login    # the default engine
+npm i -g @openai/codex@0.162.1 @agentclientprotocol/codex-acp@2.1.1 && codex login    # the default engine
 gh auth login
 ```
 
