@@ -31,6 +31,20 @@ The `assayer-review` skill teaches an agent to run a round, show you the finding
 - Claude Code: `/plugin marketplace add prismalens/assayer`, then `/plugin install assayer@assayer`.
 - Codex: copy `plugin/skills/assayer-review` into `~/.codex/skills/`.
 
+## Telemetry
+
+The first `assayer` run in a terminal prints a notice and sends nothing. Later runs send usage counts to PostHog's EU region, so we can see whether Assayer is used and where rounds fail.
+
+| Event | Properties |
+| --- | --- |
+| `install_active` | at most once a UTC day |
+| `round_finished` | engine, conclusion, findings bucket (`0`, `1`, `2-5`, `6-20`, `>20`), duration bucket, whether it was posted |
+| `refused` | engine, and which refusal: `closed`, `skip_label`, `already_reviewed`, `repo_config` |
+
+Every event also carries `product`, how it was installed (`npm` or `checkout`), OS, CPU architecture, Node major version, the Assayer version, and a random install id kept in `~/.assayer/telemetry.json`. Timestamps are cut to the UTC day, and IP geolocation is turned off. Assayer never sends repository names, paths, logins, code, prompts, findings or model output.
+
+`assayer telemetry off` turns it off, and `assayer telemetry status` shows the last 20 events sent. `ASSAYER_TELEMETRY=off`, `DO_NOT_TRACK=1` and `CI` each turn it off whatever the stored answer, and a run with no terminal never shows the notice, so it never starts.
+
 ## Layout
 
 | Path | What it is |

@@ -9,6 +9,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ENGINES } from './engines.js';
+import { countBucket, createTelemetry, durationBucket } from './telemetry.js';
 import { renderPrompt, renderCodexPrompt, promptHash, laneTokens } from './prompt.js';
 import { checkout } from './github.js';
 import { runRound } from './run.js';
@@ -18,7 +19,8 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const USAGE = `usage:
   assayer review <owner/repo#N | PR URL> [--engine codex] [--model M] [--post] [--again]
                  [--ignore-repo-config] [--out DIR]
-  assayer publish <round dir>`;
+  assayer publish <round dir>
+  assayer telemetry on|off|status`;
 
 
 export function parseTarget(s) {
@@ -29,6 +31,10 @@ export function parseTarget(s) {
 
 export function parseArgs(argv) {
   const [cmd, target, ...rest] = argv;
+  if (cmd === 'telemetry') {
+    if (!['on', 'off', 'status'].includes(target) || rest.length) throw new Error(USAGE);
+    return { cmd, action: target };
+  }
   if (cmd === 'publish') {
     if (!target || rest.length) throw new Error(USAGE);
     return { cmd, dir: target };
@@ -175,22 +181,25 @@ function printRound(dir) {
   process.stdout.write(lines.join('\n') + '\n');
 }
 
+// A refusal before any quota is spent; telemetry sends its kind, never the message.
+const refusal = (reason, message) => Object.assign(new Error(message), { refusal: reason });
+
 export async function review(o, { log = (s) => process.stderr.write(s + '\n') } = {}) {
   const pr = ghJson(`repos/${o.repo}/pulls/${o.pr}`);
-  if (pr.state !== 'open') throw new Error(`${o.repo}#${o.pr} is ${pr.merged_at ? 'merged' : pr.state}`);
+  if (pr.state !== 'open') throw refusal('closed', `${o.repo}#${o.pr} is ${pr.merged_at ? 'merged' : pr.state}`);
   // The skip label is a stop no summons lifts (README principle 11); a local run is a summons.
-  if ((pr.labels ?? []).some((l) => l.name === 'claude_review_skip')) throw new Error(`${o.repo}#${o.pr} carries claude_review_skip; remove the label to review it`);
+  if ((pr.labels ?? []).some((l) => l.name === 'claude_review_skip')) throw refusal('skip_label', `${o.repo}#${o.pr} carries claude_review_skip; remove the label to review it`);
   const headSha = pr.head.sha;
   // The PR's diff is three-dot: against the merge base, not the base branch's tip.
   const baseSha = ghJson(`repos/${o.repo}/compare/${pr.base.sha}...${headSha}`).merge_base_commit.sha;
 
   const prior = priorReview(livenessRecords(listComments(o.repo, o.pr)), { headSha, engine: o.engine, canWrite: writerCheck(o.repo) });
-  if (prior && !o.again) throw new Error(`${headSha.slice(0, 7)} already has a ${o.engine} review on record (comment ${prior.id} by ${prior.login}); pass --again to run another`);
+  if (prior && !o.again) throw refusal('already_reviewed', `${headSha.slice(0, 7)} already has a ${o.engine} review on record (comment ${prior.id} by ${prior.login}); pass --again to run another`);
 
   // Until the resolver is a package (#182), a local round knows only the workflow defaults. With
   // no repo config those are exact; with one, the round would review against the wrong rules.
   const cfg = gh(['api', `repos/${o.repo}/contents/.github/claude-review.yml?ref=${pr.base.sha}`], { allow404: true });
-  if (cfg !== null && !o.ignoreRepoConfig) throw new Error(`${o.repo} has .github/claude-review.yml, which a local round cannot apply yet (#182); pass --ignore-repo-config to review with the workflow defaults`);
+  if (cfg !== null && !o.ignoreRepoConfig) throw refusal('repo_config', `${o.repo} has .github/claude-review.yml, which a local round cannot apply yet (#182); pass --ignore-repo-config to review with the workflow defaults`);
 
   const dir = path.resolve(o.out ?? path.join(os.homedir(), '.assayer', 'reviews', `${o.repo.replace('/', '-')}-${o.pr}-${headSha.slice(0, 7)}-${Date.now()}`));
   // One directory, one round: a reused one would carry the last round's publish journal.
@@ -220,6 +229,25 @@ export async function review(o, { log = (s) => process.stderr.write(s + '\n') } 
 if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {
   let o;
   try { o = parseArgs(process.argv.slice(2)); } catch (e) { process.stderr.write(`${e.message}\n`); process.exit(2); }
-  const run = o.cmd === 'publish' ? publish(path.resolve(o.dir)).then(() => 0) : review(o).then((r) => (r.summary.conclusion === 'completed' ? 0 : 3));
-  run.then((code) => process.exit(code)).catch((e) => { process.stderr.write(`assayer: ${e.message}\n`); process.exit(1); });
+  const { version } = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+  const tel = createTelemetry({ version });
+  if (o.cmd === 'telemetry') {
+    if (o.action !== 'status') tel.set(o.action === 'on');
+    process.stdout.write(tel.status() + '\n');
+    process.exit(0);
+  }
+  tel.start();
+  tel.active();
+  const t0 = Date.now();
+  const run = o.cmd === 'publish'
+    ? publish(path.resolve(o.dir)).then(() => 0)
+    : review(o).then((r) => {
+      tel.capture('round_finished', { engine: o.engine, conclusion: r.summary.conclusion, findings: countBucket(r.summary.findings), duration_bucket: durationBucket(Date.now() - t0), posted: r.posted !== null });
+      return r.summary.conclusion === 'completed' ? 0 : 3;
+    });
+  run.catch((e) => {
+    if (e.refusal) tel.capture('refused', { engine: o.engine, reason: e.refusal });
+    process.stderr.write(`assayer: ${e.message}\n`);
+    return 1;
+  }).then(async (code) => { await tel.flush(); process.exit(code); });
 }
