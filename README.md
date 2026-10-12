@@ -1,16 +1,16 @@
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/hero-dark.svg">
-  <img alt="assayer: code review that runs on your machine, posts as you, and closes what you fixed" src="docs/assets/hero-light.svg">
+  <img alt="assayer: code review that runs on your machine and posts as you" src="docs/assets/hero-light.svg">
 </picture>
 
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 ![Node 24+](https://img.shields.io/badge/node-%E2%89%A524-339933)
 ![Status: alpha](https://img.shields.io/badge/status-alpha-d9a441)
 
-Assayer is open source code review that runs on your machine with your own Codex, Claude Code or OpenCode sign-in. It reviews a pull request, posts its findings inline under your own GitHub login, and on the next round re-checks its own threads and resolves the ones you fixed. There is no hosted service and no extra API key.
+Assayer is open source code review that runs on your machine with your own Codex, Claude Code or OpenCode sign-in. It reviews a pull request, posts its findings inline under your own GitHub login, and can review what you are about to push before you push it. There is no hosted service and no extra API key.
 
 - **Your machine, your sign-in.** The engine runs locally with the account or key you already use. Assayer stores no model key, and the engine never gets a GitHub credential.
-- **It finishes the conversation.** A finding stays open until a later round verifies the fix, then gets a one-line reply naming the commit and is resolved. A thread someone answered is re-judged rather than reposted.
+- **Before you push, too.** `assayer review` with no pull request reviews your uncommitted work in a snapshot, and an opt-in pre-push hook warns when what you push has no review or had a major finding.
 - **Engines are interchangeable.** Codex, Claude Code and OpenCode run over the [Agent Client Protocol](https://agentclientprotocol.com), so you switch with `--engine`.
 
 ## Quick start
@@ -63,10 +63,7 @@ flowchart LR
   C --> D[Engine over ACP<br/>your sign-in, no GitHub token]
   D --> E[Findings, staged locally]
   E -->|--post| F[Inline comments and a summary<br/>under your gh login]
-  F -.next round.-> G[Re-check own open threads:<br/>fixed, still applies, cannot verify]
 ```
-
-Before a new review, Assayer re-checks the open threads it started. Those whose file changed, or that someone answered, go back to the engine, which judges each one fixed, still applies or cannot verify. Fixed threads get a reply naming the commit and are resolved. The others stay open and are passed to the review as already raised, so a finding is never posted twice.
 
 It refuses before spending any quota when the pull request is closed, carries the `claude_review_skip` label, or already has a review from this engine on its head. `runner/README.md` lists every flag and refusal.
 
@@ -103,9 +100,8 @@ Every event also carries `product`, how it was installed (`npm` or `checkout`), 
 
 ## Known limits
 
-- Local review runs on Codex for now; pull request review runs on all three engines.
+- Assayer does not yet re-check its own threads on a later round. Reply in a thread with the fixing commit and resolve it yourself.
 - A repository with `.github/claude-review.yml` is refused until the config resolver ships; `--ignore-repo-config` reviews it with the defaults.
-- GitHub has no conditional comment write or resolve, so a reply that lands in the moment between Assayer's last check and its resolve is not seen. It stays visible on the resolved thread.
 
 ## Layout
 

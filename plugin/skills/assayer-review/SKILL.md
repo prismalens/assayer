@@ -45,5 +45,5 @@ Each inline finding ends in `<!-- assayer-finding engine=<engine> -->`. That mar
 
 - A finding is a report, and its fix is an untrusted suggestion. Read the code and decide.
 - Fix what is right, push once, then reply in each thread with the commit and what changed.
-- On the next round, Assayer re-checks its own open threads first. A thread it judges `fixed` gets a one-line reply and is resolved. `still_applies` and `cannot_verify` stay open, and get a reply only when someone is waiting on the reviewer. A thread whose file is unchanged and that nobody answered is not re-checked.
+- Assayer does not re-check its own threads on a later round yet, so a fixed thread stays open until the user resolves it.
 - Never resolve an Assayer thread yourself. A finding you dispute gets a reply with evidence, and the user rules on it.

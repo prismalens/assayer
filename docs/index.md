@@ -5,10 +5,10 @@ title: Assayer
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/hero-dark.svg">
-  <img alt="assayer: code review that runs on your machine, posts as you, and closes what you fixed" src="assets/hero-light.svg" style="max-width:100%">
+  <img alt="assayer: code review that runs on your machine and posts as you" src="assets/hero-light.svg" style="max-width:100%">
 </picture>
 
-Assayer is open source code review that runs on your machine with your own Codex, Claude Code or OpenCode sign-in. It reviews a pull request, posts its findings inline under your own GitHub login, and on the next round re-checks its own threads and resolves the ones you fixed. There is no hosted service and no extra API key.
+Assayer is open source code review that runs on your machine with your own Codex, Claude Code or OpenCode sign-in. It reviews a pull request, posts its findings inline under your own GitHub login, and can review what you are about to push before you push it. There is no hosted service and no extra API key.
 
 ```bash
 assayer doctor                          # what this machine has for a round

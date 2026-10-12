@@ -11,16 +11,9 @@ title: How it works
 4. The engine records each finding and a summary through two tools. Assayer checks every finding before anything is posted: a body that looks like a credential is dropped, and a finding it cannot anchor to a changed line is posted as a plain comment instead.
 5. With `--post`, the findings land as inline comments under your login, each ending in a hidden `assayer-finding` marker, and a summary comment gives the coverage.
 
-## Closing the loop
+## After the review
 
-Before reviewing a new head, Assayer re-checks the open threads it started:
-
-- A thread whose file has not changed and that nobody answered stays open without a model call.
-- The rest go back to the engine, which judges each one **fixed**, **still applies** or **cannot verify**.
-- A fixed thread gets a one-line reply naming the commit and is resolved. The others get a reply only when someone is waiting on the reviewer.
-- Threads that stay open are handed to the review as already raised, so the same finding is never posted twice.
-
-GitHub has no conditional comment write or resolve. Assayer reads each thread again right before it writes, so the window is one request wide, not zero. A reply that lands inside it stays visible on the resolved thread, and anyone can reopen it.
+Assayer does not yet re-check its own threads on a later round. Reply in a thread with the commit that fixes it, and resolve it yourself. `--again` runs a fresh review of a head this engine already reviewed.
 
 ## Whose name is on it
 
