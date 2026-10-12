@@ -262,15 +262,29 @@ export function readFindings(dir) {
   return { events, findings: events.filter((e) => e.type === 'finding') };
 }
 
+// The summary is GitHub markdown; on a terminal its headings, bold and code read as styling.
+export function terminalMarkdown(md, tty) {
+  if (!tty) return md;
+  return md.split('\n').map((l) => {
+    const h = /^#{1,6}\s+(.*)$/.exec(l);
+    const line = (h ? h[1] : l).replace(/\*\*([^*]+)\*\*/g, '\x1b[1m$1\x1b[22m').replace(/`([^`]+)`/g, '\x1b[36m$1\x1b[39m');
+    return h ? `\x1b[1m${line}\x1b[22m` : line;
+  }).join('\n');
+}
+
 // Most severe first; the engine's filing order breaks ties.
-export function findingLines(findings) {
+const SEV_STYLE = { critical: ['Critical', 31], major: ['Major', 33], minor: ['Minor', 36] };
+
+export function findingLines(findings, { tty = false } = {}) {
   return findings
     .map((f, i) => ({ f, i, sev: severityOf(f.body) }))
     .sort((a, b) => SEVERITIES.indexOf(a.sev) - SEVERITIES.indexOf(b.sev) || a.i - b.i)
     .map(({ f, sev }) => {
       const after = f.body.slice(f.body.indexOf('</details>') + 1);
       const title = (/\*\*(.+?)\*\*/.exec(after)?.[1] ?? f.body.split('\n')[0]).slice(0, 140);
-      return `  [${sev[0].toUpperCase()}${sev.slice(1)}] ${f.path}:${f.line ?? '?'}  ${title}`;
+      if (!tty) return `  [${sev[0].toUpperCase()}${sev.slice(1)}] ${f.path}:${f.line ?? '?'}  ${title}`;
+      const [label, code] = SEV_STYLE[sev];
+      return `  \x1b[${code}m● ${label.padEnd(8)}\x1b[0m ${f.path}:${f.line ?? '?'}  ${title.replace(/`([^`]+)`/g, '\x1b[36m$1\x1b[39m')}`;
     });
 }
 
@@ -297,9 +311,9 @@ function printRound(dir) {
     return;
   }
   const lines = [`${s.conclusion}: ${s.findings ?? 0} finding(s) in ${Math.round((s.wall_clock_ms ?? 0) / 1000)}s`];
-  lines.push(...findingLines(findings));
+  lines.push(...findingLines(findings, { tty: Boolean(process.stdout.isTTY) }));
   const summary = events.findLast((e) => e.type === 'summary');
-  if (summary) lines.push('', withoutEngineCredit(summary.body));
+  if (summary) lines.push('', terminalMarkdown(withoutEngineCredit(summary.body), Boolean(process.stdout.isTTY)));
   process.stdout.write(lines.join('\n') + '\n');
 }
 
@@ -341,7 +355,8 @@ export function roundDir(arg, home = assayerHome()) {
 // The live view stops before the round's own closing line, so the two never share a row.
 async function watched(dir, engine, log, run) {
   const view = startProgress(dir, { engine });
-  try { return await run((s) => { view.stop(); log(s); }); } finally { view.stop(); }
+  // runRound's own closing tally repeats what printRound says next; anything else it logs stays.
+  try { return await run((s) => { view.stop(); if (!/^assayer-run: [\w-]+ in \d+s, /.test(s)) log(s); }); } finally { view.stop(); }
 }
 
 // A refusal before any quota is spent; telemetry sends its kind, never the message.

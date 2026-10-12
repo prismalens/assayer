@@ -176,4 +176,10 @@ describe('local prompt and CLI', () => {
     assert.match(failureLines({ engine: 'opencode', conclusion: 'timed-out', timed_out_by: 'idle', errors: [] })[0], /went quiet.*idle/);
     assert.match(failureLines({ engine: 'codex', conclusion: 'failed', errors: [] })[0], /no reason recorded/);
   });
+
+  it('renders summary markdown as terminal styling only on a terminal', async () => {
+    const { terminalMarkdown } = await import('../src/review.js');
+    assert.equal(terminalMarkdown('## Code review\n**Cache** key `x`', false), '## Code review\n**Cache** key `x`');
+    assert.equal(terminalMarkdown('## Code review\n**Cache** key `x`', true), '\x1b[1mCode review\x1b[22m\n\x1b[1mCache\x1b[22m key \x1b[36mx\x1b[39m');
+  });
 });
