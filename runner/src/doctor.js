@@ -4,7 +4,7 @@
 import { spawnSync } from 'node:child_process';
 import { accessSync, constants } from 'node:fs';
 import path from 'node:path';
-import { ENGINES } from './engines.js';
+import { ENGINES, codexSandboxModeSet } from './engines.js';
 
 const MIN_NODE = 24;
 
@@ -44,7 +44,8 @@ export function doctor({ probe = defaultProbe, which = onPath, nodeVersion = pro
     const version = cli?.ok ? firstVersion(cli.out) : null;
     const ready = Boolean(cli?.ok && adapter);
     const missing = [...new Set([!cli?.ok && row.cli, !adapter && row.command].filter(Boolean))];
-    const note = ready && row.admitted?.version && version && version !== row.admitted.version ? `; tested on ${row.admitted.version}` : '';
+    const note = (ready && row.admitted?.version && version && version !== row.admitted.version ? `; tested on ${row.admitted.version}` : '')
+      + (ready && id === 'codex' && codexSandboxModeSet() ? '; your sandbox_mode turns off its credential deny list' : '');
     const fix = [...new Set([!cli?.ok && row.install?.cli, !adapter && row.install?.adapter].filter(Boolean))];
     add(`engine ${id}`, ready, ready ? `${row.cli} ${version ?? ''}${note}`.trim() : `missing ${missing.join(' and ')}${fix.length ? `: npm i -g ${fix.join(' ')}` : ''}`, false);
     return ready;

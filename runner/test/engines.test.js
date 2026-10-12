@@ -26,3 +26,17 @@ describe('Codex credential paths', () => {
     assert.equal(cfg.sandbox_mode, undefined, 'a sandbox_mode would switch Codex back to the legacy settings and drop the profile');
   });
 });
+
+describe('a user sandbox_mode', () => {
+  it('is found in the Codex config, top level or in a profile', async () => {
+    const { codexSandboxModeSet } = await import('../src/engines.js');
+    const { mkdtempSync, writeFileSync } = await import('node:fs');
+    const os = (await import('node:os')).default; const path = (await import('node:path')).default;
+    const home = mkdtempSync(path.join(os.tmpdir(), 'codex-home-'));
+    assert.equal(codexSandboxModeSet({ CODEX_HOME: home }), null);
+    writeFileSync(path.join(home, 'config.toml'), 'model = "x"\n[profiles.fast]\n  sandbox_mode = "workspace-write"\n');
+    assert.equal(codexSandboxModeSet({ CODEX_HOME: home }), path.join(home, 'config.toml'));
+    const cfg = JSON.parse(ENGINES.codex.prepare({ env: {} }).CODEX_CONFIG);
+    assert.equal(cfg.permissions.assayer.filesystem[':workspace_roots'], 'read');
+  });
+});

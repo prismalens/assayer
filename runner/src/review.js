@@ -8,7 +8,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync, rea
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ENGINES } from './engines.js';
+import { ENGINES, codexSandboxModeSet } from './engines.js';
 import { countBucket, createTelemetry, durationBucket } from './telemetry.js';
 import { doctor, formatDoctor } from './doctor.js';
 import { renderPrompt, renderCodexPrompt, promptHash, laneTokens } from './prompt.js';
@@ -355,6 +355,12 @@ export function roundDir(arg, home = assayerHome()) {
   return !existsSync(path.resolve(arg)) && !arg.includes(path.sep) && existsSync(kept) ? kept : path.resolve(arg);
 }
 
+// The user's own Codex sandbox_mode switches off the credential deny list; say so every round.
+function warnCodexSandbox(engine, log) {
+  const file = engine === 'codex' && codexSandboxModeSet();
+  if (file) log(`assayer: ${tilde(file)} sets sandbox_mode, so Codex ignores the profile that keeps it out of your credential files (gh, SSH, cloud CLIs). Remove sandbox_mode or use another engine for pull requests you do not trust.`);
+}
+
 // The live view stops before the round's own closing line, so the two never share a row.
 async function watched(dir, engine, log, run) {
   const view = startProgress(dir, { engine });
@@ -392,6 +398,7 @@ export async function reviewLocal(o, { log = (s) => process.stderr.write(s + '\n
   const round = { mode: 'local', repository: null, pr_number: null, local_path: top, head_sha: snap.head, head_tree: snap.tree, base_sha: base.sha, base_source: base.source, dirty: snap.dirty, engine: o.engine, model: o.model, where: 'local' };
   writeFileSync(path.join(dir, 'round.json'), JSON.stringify(round, null, 2) + '\n');
   log(`assayer: local changes in ${label}, ${snap.dirty ? 'working tree' : snap.head.slice(0, 7)} vs ${base.sha.slice(0, 7)} from ${base.source}, with ${o.engine}; round in ${tilde(dir)}`);
+  warnCodexSandbox(o.engine, log);
   const summary = await watched(dir, o.engine, log, (log) => runRound({
     cwd: checkoutDir, prompt: path.join(dir, 'prompt.md'), out: dir, engine: o.engine, model: o.model, promptHash: prompt.hash,
     stage: true, repo, pr: '0', headSha: snap.head, baseSha: base.sha, mode: 'review', ghToken: '', engineGh: 'offline',
@@ -430,6 +437,7 @@ export async function review(o, { log = (s) => process.stderr.write(s + '\n') } 
   const token = gh(['auth', 'token']).trim();
   const cwd = path.join(dir, 'checkout');
   log(`assayer: ${o.repo}#${o.pr} at ${headSha.slice(0, 7)} with ${o.engine}; round in ${tilde(dir)}`);
+  warnCodexSandbox(o.engine, log);
   await checkout({ repository: o.repo, headSha, baseSha, token, dir: cwd });
 
   const prompt = renderFor(o.engine, { repo: o.repo, pr: o.pr, baseSha, headSha });

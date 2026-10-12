@@ -1,6 +1,7 @@
 // The engine registry: what to spawn and how it takes its model and credential. Every row is
 // an ACP agent on stdio. A row enters only after an admission run passes; `admitted` records it.
-import { writeFileSync, mkdirSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 
 // Env is an allowlist per row, never the runner's whole environment (prismalens#169).
@@ -12,6 +13,13 @@ export const CODEX_DENY = Object.freeze(Object.fromEntries([
   '~/.config/gh', '~/.ssh', '~/.aws', '~/.azure', '~/.config/gcloud', '~/.kube', '~/.docker', '~/.npmrc', '~/.netrc',
   '~/.git-credentials', '~/.config/git/credentials', '~/.gnupg', '~/.claude/.credentials.json', '~/.local/share/opencode/auth.json',
 ].map((p) => [p, 'deny'])));
+
+// Codex ignores a permission profile when any loaded config sets sandbox_mode (its permissions
+// docs), and the deny list above goes with it. Assayer leaves the user's CODEX_HOME in place.
+export function codexSandboxModeSet(env = process.env) {
+  const file = path.join(env.CODEX_HOME || path.join(os.homedir(), '.codex'), 'config.toml');
+  try { return /^\s*sandbox_mode\s*=/m.test(readFileSync(file, 'utf8')) ? file : null; } catch { return null; }
+}
 
 export const ENGINES = Object.freeze({
   opencode: {
@@ -75,7 +83,7 @@ export const ENGINES = Object.freeze({
         ...env, INITIAL_AGENT_MODE: 'read-only', NO_BROWSER: '1',
         CODEX_CONFIG: JSON.stringify({
           web_search: 'disabled', project_doc_max_bytes: 0, model_reasoning_effort: 'xhigh', features: { plugins: false }, ...(model ? { model } : {}),
-          default_permissions: 'assayer', permissions: { assayer: { filesystem: { glob_scan_max_depth: 3, ':minimal': 'read', ...CODEX_DENY } } },
+          default_permissions: 'assayer', permissions: { assayer: { filesystem: { glob_scan_max_depth: 3, ':minimal': 'read', ':workspace_roots': 'read', ...CODEX_DENY } } },
         }),
       };
     },
