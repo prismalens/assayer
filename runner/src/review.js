@@ -321,13 +321,10 @@ function printRound(dir) {
 // choosing it leads to the setup offer below.
 async function pickEngine() {
   const { select, isCancel } = await import('@clack/prompts');
-  const checks = Object.fromEntries(doctor().checks.map((c) => [c.name, c]));
+  // A PATH lookup only: doctor's version probes took seconds before the question appeared.
   const choice = await select({
     message: 'Which engine should review? This becomes your default.',
-    options: Object.keys(LABELS).map((id) => {
-      const c = checks[`engine ${id}`];
-      return { value: id, label: LABELS[id], hint: c.ok ? c.detail : 'not installed yet; Assayer can set it up' };
-    }),
+    options: Object.keys(LABELS).map((id) => ({ value: id, label: LABELS[id], hint: missingFor(id).length ? 'not installed yet; Assayer can set it up' : 'installed' })),
   });
   if (isCancel(choice)) throw Object.assign(new Error('no engine chosen; nothing saved'), { cancelled: true });
   return choice;
