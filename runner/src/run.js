@@ -65,8 +65,9 @@ export function whichGh(pathVar) {
   return null;
 }
 
-function mcpServer(name, toolLog) {
-  return { name, command: process.execPath, args: [path.join(HERE, 'finding-tools.js'), name], env: [{ name: 'ASSAYER_TOOL_LOG', value: toolLog }] };
+function mcpServer(name, toolLog, diffPath = null) {
+  const env = [{ name: 'ASSAYER_TOOL_LOG', value: toolLog }, ...(diffPath ? [{ name: 'ASSAYER_DIFF', value: diffPath }] : [])];
+  return { name, command: process.execPath, args: [path.join(HERE, 'finding-tools.js'), name], env };
 }
 
 export async function runRound(opts, { log = (s) => process.stderr.write(s + '\n') } = {}) {
@@ -182,7 +183,7 @@ export async function runRound(opts, { log = (s) => process.stderr.write(s + '\n
         throw Object.assign(new Error('agent requires authentication: ' + init.authMethods.map((m) => m.id).join(', ')), { stage: 'initialize' });
       }
       return ctx.buildSession({ cwd, mcpServers: [], ...(row.sessionMeta ? { _meta: row.sessionMeta } : {}) })
-        .withMcpServer(mcpServer('github_inline_comment', toolLog))
+        .withMcpServer(mcpServer('github_inline_comment', toolLog, staged && existsSync(path.join(cwd, '.claude-review.diff')) ? path.join(cwd, '.claude-review.diff') : null))
         .withMcpServer(mcpServer('github_comment', toolLog))
         .withSession(async (session) => {
           mapper.sessionId = session.sessionId;

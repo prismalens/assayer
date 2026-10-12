@@ -5,11 +5,12 @@
 // Server name is argv[2]: `github_inline_comment` serves create_inline_comment,
 // `github_comment` serves update_claude_comment, so the engine sees the same
 // mcp__<server>__<tool> names the Actions lane's prompt uses.
-import { appendFileSync } from 'node:fs';
+import { appendFileSync, readFileSync } from 'node:fs';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 import { looksLikeSecret } from './acp-map.js';
+import { anchorProblem, hunkRanges } from './diff-lines.js';
 
 const which = process.argv[2];
 const log = process.env.ASSAYER_TOOL_LOG;
@@ -29,6 +30,9 @@ function record(tool, input) {
   }) + '\n');
 }
 
+let diff = null;
+try { if (process.env.ASSAYER_DIFF) diff = hunkRanges(readFileSync(process.env.ASSAYER_DIFF, 'utf8')); } catch { diff = null; }
+
 const server = new McpServer({ name: which, version: '0.0.0' });
 
 if (which === 'github_inline_comment') {
@@ -45,6 +49,10 @@ if (which === 'github_inline_comment') {
       commitId: z.string().optional(),
     },
   }, async (input) => {
+    // Refused at filing time, as GitHub refuses it at posting time, so the engine re-files on a
+    // diff line instead of leaving a stray copy. No diff to check against: recorded as before.
+    const problem = diff && anchorProblem(diff, input);
+    if (problem) return { isError: true, content: [{ type: 'text', text: `Not recorded: ${problem}.` }] };
     record('create_inline_comment', input);
     return { content: [{ type: 'text', text: JSON.stringify({ ok: true, recorded: true }) }] };
   });
