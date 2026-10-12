@@ -87,3 +87,10 @@ describe('PR reviews and kept rounds', () => {
     assert.equal(roundDir('/abs/elsewhere', home), '/abs/elsewhere');
   });
 });
+
+describe('help', () => {
+  it('--help, -h and help ask for help anywhere; a bare assayer stays a usage error', () => {
+    for (const a of [['--help'], ['-h'], ['help'], ['review', '--help'], ['review', 'a/b#1', '-h']]) assert.deepEqual(parseArgs(a), { cmd: 'help' }, a.join(' '));
+    assert.throws(() => parseArgs([]), /usage:/);
+  });
+});

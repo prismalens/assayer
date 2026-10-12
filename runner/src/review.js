@@ -38,6 +38,20 @@ const USAGE = `usage:
   assayer --version`;
 
 
+export const HELP = `assayer: code review on your machine, with your own engine sign-in, posted as you.
+
+${USAGE.replace(/^usage:\n/, 'Usage:\n')}
+
+Examples:
+  assayer review owner/repo#123             review a pull request and print the findings
+  assayer review owner/repo#123 --post      post them inline on the pull request, as you
+  assayer review                            review your uncommitted work before you push
+  assayer doctor                            check what this machine has for a round
+  assayer config set engine claude-code     change your default engine (codex, claude-code, opencode)
+
+The first review asks which engine to use and can install it. Rounds are kept in ~/.assayer/reviews.
+Docs: https://github.com/prismalens/assayer#readme`;
+
 export function parseTarget(s) {
   const m = /^(?:https:\/\/github\.com\/)?([\w.-]+\/[\w.-]+)(?:#|\/pull\/)(\d+)\/?$/.exec(String(s ?? '').trim());
   if (!m) throw new Error(`cannot read ${JSON.stringify(s)} as owner/repo#N or a pull request URL`);
@@ -45,6 +59,7 @@ export function parseTarget(s) {
 }
 
 export function parseArgs(argv) {
+  if (argv[0] === 'help' || argv.some((a) => a === '--help' || a === '-h')) return { cmd: 'help' };
   const [cmd, target, ...rest] = argv;
   if ((cmd === 'doctor' || cmd === '--version') && target === undefined) return { cmd };
   if (cmd === 'telemetry') {
@@ -475,6 +490,7 @@ if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.me
   try { o = parseArgs(process.argv.slice(2)); } catch (e) { process.stderr.write(`${e.message}\n`); process.exit(2); }
   const { version } = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
   if (o.cmd === '--version') { process.stdout.write(`${version}\n`); process.exit(0); }
+  if (o.cmd === 'help') { process.stdout.write(`${HELP}\n`); process.exit(0); }
   if (o.cmd === 'doctor') { const d = doctor(); process.stdout.write(formatDoctor(d) + '\n'); process.exit(d.ok ? 0 : 1); }
   const tel = createTelemetry({ version });
   if (o.cmd === 'telemetry') {
