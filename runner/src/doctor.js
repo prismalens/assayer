@@ -25,9 +25,10 @@ function defaultProbe(cmd, args) {
 
 const firstVersion = (s) => /\d+\.\d+\.\d+/.exec(s ?? '')?.[0] ?? null;
 
-export function doctor({ probe = defaultProbe, which = onPath, nodeVersion = process.versions.node } = {}) {
+export function doctor({ probe = defaultProbe, which = onPath, nodeVersion = process.versions.node, platform = process.platform } = {}) {
   const checks = [];
   const add = (name, ok, detail, required = true) => checks.push({ name, ok, detail, required });
+  if (platform === 'win32') add('platform', false, 'a round runs on Linux or macOS; on Windows, install and run Assayer inside WSL');
 
   add('node', Number.parseInt(nodeVersion, 10) >= MIN_NODE, `${nodeVersion} (needs ${MIN_NODE} or newer)`);
   for (const [name, args] of [['git', ['--version']], ['python3', ['--version']], ['gh', ['--version']]]) {

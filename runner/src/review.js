@@ -463,6 +463,10 @@ if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.me
       process.exit(0);
     } catch (e) { process.stderr.write(`assayer: ${e.message}\n`); process.exit(2); }
   }
+  if (o.cmd === 'review' && process.platform === 'win32') {
+    process.stderr.write('assayer: a review round runs on Linux or macOS; on Windows, install and run Assayer inside WSL\n');
+    process.exit(1);
+  }
   if (o.cmd === 'review') {
     try {
       o = await resolveDefaults(o, {

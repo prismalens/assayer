@@ -15,7 +15,7 @@ Assayer is open source code review that runs on your machine with your own Codex
 
 ## Quick start
 
-You need Node 24 or newer, `git`, `python3` and the [GitHub CLI](https://cli.github.com) signed in (`gh auth login`).
+You need Linux or macOS (on Windows, use WSL), Node 24 or newer, `git`, `python3` and the [GitHub CLI](https://cli.github.com) signed in (`gh auth login`).
 
 ```bash
 npm i -g @prismalens/assayer

@@ -41,3 +41,10 @@ describe('doctor', () => {
     assert.throws(() => parseArgs(['doctor', 'extra']), /usage/);
   });
 });
+
+it('native Windows is not ready for a round and says to use WSL', async () => {
+  const { doctor } = await import('../src/doctor.js');
+  const d = doctor({ platform: 'win32', which: () => '/x', probe: () => ({ ok: true, out: '1.0.0' }), nodeVersion: '24.0.0' });
+  assert.equal(d.ok, false);
+  assert.match(d.checks.find((c) => c.name === 'platform').detail, /inside WSL/);
+});

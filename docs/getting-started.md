@@ -5,6 +5,7 @@ title: Getting started
 
 ## What you need
 
+- Linux or macOS. On Windows, install and run Assayer inside [WSL](https://learn.microsoft.com/windows/wsl/install).
 - Node 24 or newer, `git` and `python3`.
 - The GitHub CLI, signed in: `gh auth login`.
 - An engine: Codex, Claude Code or OpenCode. Assayer can install the one you pick; you sign in to it yourself. See [Engines](engines.md).
