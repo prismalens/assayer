@@ -11,6 +11,6 @@ title: Engines
 
 Use whichever sign-in your plan offers. Each provider's own terms apply: [OpenAI](https://openai.com/policies/), [Anthropic](https://www.anthropic.com/legal), [OpenCode](https://opencode.ai).
 
-Pick one per round with `--engine`. `assayer doctor` shows which are ready, and notes when the installed version differs from the one Assayer was tested on. That is a note, never a block.
+Your first review asks which installed engine to use and saves it as your default; `assayer config set engine <name>` changes it, and `--engine` overrides it for one round. `assayer doctor` shows which are ready, and notes when the installed version differs from the one Assayer was tested on. That is a note, never a block.
 
 Each engine runs read-only: Codex starts in its read-only mode, OpenCode runs with edits and shell commands set to ask, and Assayer answers every request from a fixed allowlist.

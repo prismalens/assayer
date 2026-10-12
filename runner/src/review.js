@@ -19,13 +19,16 @@ import { changedFiles, chooseBase, localCheckout, refusal as localRefusal, repoT
 
 export { severityOf };
 import { hookCommand } from './hook.js';
+import { KEYS, formatSettings, readSettings, resolveDefaults, settingsFile, writeSetting } from './settings.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const USAGE = `usage:
-  assayer review <owner/repo#N | PR URL> [--engine codex] [--model M] [--post] [--again]
+  assayer review <owner/repo#N | PR URL> [--engine E] [--model M] [--post] [--again]
                  [--ignore-repo-config] [--out DIR]
-  assayer review [--base REF] [--head REV] [--fail-on critical|major|minor] [--model M]
-                 [--ignore-repo-config] [--out DIR]      reviews local changes, prints only
+  assayer review [--base REF] [--head REV] [--engine E] [--model M]
+                 [--fail-on critical|major|minor] [--ignore-repo-config] [--out DIR]
+                                                         reviews local changes, prints only
+  assayer config [set <key> <value> | unset <key>]       engine, model, fail-on defaults
   assayer hook install|uninstall
   assayer publish <round dir>
   assayer telemetry on|off|status
@@ -46,6 +49,12 @@ export function parseArgs(argv) {
     if (!['on', 'off', 'status'].includes(target) || rest.length) throw new Error(USAGE);
     return { cmd, action: target };
   }
+  if (cmd === 'config') {
+    if (target === undefined) return { cmd, action: 'show' };
+    if (target === 'set' && rest.length === 2 && rest[0] in KEYS) return { cmd, action: 'set', key: rest[0], value: rest[1] };
+    if (target === 'unset' && rest.length === 1 && rest[0] in KEYS) return { cmd, action: 'unset', key: rest[0] };
+    throw new Error(`assayer config [set <key> <value> | unset <key>]; keys: ${Object.keys(KEYS).join(', ')}`);
+  }
   if (cmd === 'publish') {
     if (!target || rest.length) throw new Error(USAGE);
     return { cmd, dir: target };
@@ -56,7 +65,7 @@ export function parseArgs(argv) {
   }
   if (cmd === 'review' && (target === undefined || target.startsWith('--'))) return parseLocal(target === undefined ? [] : [target, ...rest]);
   if (cmd !== 'review' || !target) throw new Error(USAGE);
-  const o = { cmd, ...parseTarget(target), engine: 'codex', model: null, post: false, again: false, ignoreRepoConfig: false, out: null };
+  const o = { cmd, ...parseTarget(target), engine: null, model: null, post: false, again: false, ignoreRepoConfig: false, out: null };
   for (let i = 0; i < rest.length; i += 1) {
     const a = rest[i];
     const need = () => { const v = rest[i + 1]; if (v === undefined) throw new Error(`${a} needs a value`); i += 1; return v; };
@@ -68,14 +77,18 @@ export function parseArgs(argv) {
     else if (a === '--out') o.out = need();
     else throw new Error(`unknown argument ${a}\n${USAGE}`);
   }
-  if (!(o.engine in ENGINES)) throw new Error(`unknown engine ${o.engine}; known: ${Object.keys(ENGINES).join(', ')}`);
+  checkEngine(o.engine);
   return o;
+}
+
+function checkEngine(engine) {
+  if (engine !== null && !(engine in ENGINES)) throw new Error(`unknown engine ${engine}; known: ${Object.keys(ENGINES).join(', ')}`);
 }
 
 export const SEVERITIES = ['critical', 'major', 'minor'];
 
 function parseLocal(rest) {
-  const o = { cmd: 'review', local: true, engine: 'codex', model: null, base: null, head: null, failOn: null, ignoreRepoConfig: false, out: null };
+  const o = { cmd: 'review', local: true, engine: null, model: null, base: null, head: null, failOn: null, ignoreRepoConfig: false, out: null };
   for (let i = 0; i < rest.length; i += 1) {
     const a = rest[i];
     const need = () => { const v = rest[i + 1]; if (v === undefined) throw new Error(`${a} needs a value`); i += 1; return v; };
@@ -89,7 +102,7 @@ function parseLocal(rest) {
     else if (a === '--post' || a === '--again') throw new Error(`${a} needs a pull request; a local review prints only\n${USAGE}`);
     else throw new Error(`unknown argument ${a}\n${USAGE}`);
   }
-  if (o.engine !== 'codex') throw new Error('local review needs --engine codex for now');
+  checkEngine(o.engine);
   if (o.failOn !== null && !SEVERITIES.includes(o.failOn)) throw new Error(`--fail-on takes ${SEVERITIES.join(', ')}`);
   return o;
 }
@@ -232,6 +245,23 @@ function printRound(dir) {
   process.stdout.write(lines.join('\n') + '\n');
 }
 
+// The one-time question: only engines doctor finds installed are offered.
+async function pickEngine() {
+  const { select, isCancel } = await import('@clack/prompts');
+  const order = Object.keys(LABELS);
+  const ready = doctor().checks.filter((c) => c.name.startsWith('engine ') && c.ok)
+    .sort((x, y) => order.indexOf(x.name.slice(7)) - order.indexOf(y.name.slice(7)));
+  if (!ready.length) throw new Error(`no engine is installed; \`assayer doctor\` says what is missing (${settingsFile()} unchanged)`);
+  const choice = await select({
+    message: 'Which engine should review? This becomes your default.',
+    options: ready.map((c) => ({ value: c.name.slice('engine '.length), label: LABELS[c.name.slice('engine '.length)], hint: c.detail })),
+  });
+  if (isCancel(choice)) throw Object.assign(new Error('no engine chosen; nothing saved'), { cancelled: true });
+  return choice;
+}
+
+const LABELS = { codex: 'Codex', 'claude-code': 'Claude Code', opencode: 'OpenCode' };
+
 // A refusal before any quota is spent; telemetry sends its kind, never the message.
 const refusal = (reason, message) => Object.assign(new Error(message), { refusal: reason });
 
@@ -330,6 +360,21 @@ if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.me
     process.exit(0);
   }
   if (o.cmd === 'hook') process.exit(hookCommand(o));
+  if (o.cmd === 'config') {
+    try {
+      if (o.action !== 'show') writeSetting(o.key, o.action === 'set' ? o.value : undefined);
+      process.stdout.write(formatSettings(readSettings()) + '\n');
+      process.exit(0);
+    } catch (e) { process.stderr.write(`assayer: ${e.message}\n`); process.exit(2); }
+  }
+  if (o.cmd === 'review') {
+    try {
+      o = await resolveDefaults(o, {
+        settings: readSettings(), isTTY: Boolean(process.stdin.isTTY && process.stdout.isTTY), pick: pickEngine,
+        save: (k, v) => writeSetting(k, v), log: (s) => process.stderr.write(s + '\n'),
+      });
+    } catch (e) { process.stderr.write(`assayer: ${e.message}\n`); process.exit(e.cancelled ? 130 : 2); }
+  }
   tel.start();
   tel.active();
   const t0 = Date.now();

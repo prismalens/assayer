@@ -24,7 +24,7 @@ assayer review owner/repo#123 --post     # review and post the findings as the u
 assayer publish <round dir>              # post, or resume posting, a round that already ran
 ```
 
-`--engine codex|claude-code|opencode` picks the engine and `--model` the model. The round is written to `~/.assayer/reviews/<repo>-<pr>-<sha>-<time>/` unless `--out` names a new directory.
+`--engine codex|claude-code|opencode` picks the engine and `--model` the model, over the user's defaults in `~/.assayer/config.json` (`assayer config`). With neither, the first round on a terminal asks once and saves the answer; pass `--engine` when you run it, since you have no terminal to answer from. The round is written to `~/.assayer/reviews/<repo>-<pr>-<sha>-<time>/` unless `--out` names a new directory.
 
 It refuses before spending quota when:
 

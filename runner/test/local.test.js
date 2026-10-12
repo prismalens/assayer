@@ -128,7 +128,8 @@ describe('local prompt and CLI', () => {
     assert.deepEqual(parseArgs(['review']).local, true);
     assert.equal(parseArgs(['review', '--base', 'main', '--fail-on', 'major']).failOn, 'major');
     assert.throws(() => parseArgs(['review', '--post']), /needs a pull request/);
-    assert.throws(() => parseArgs(['review', '--engine', 'opencode']), /--engine codex/);
+    assert.equal(parseArgs(['review', '--engine', 'opencode']).engine, 'opencode');
+    assert.throws(() => parseArgs(['review', '--engine', 'nope']), /unknown engine/);
     assert.throws(() => parseArgs(['review', '--fail-on', 'loud']), /--fail-on takes/);
     assert.equal(parseArgs(['review', 'acme/w#3']).local, undefined);
   });

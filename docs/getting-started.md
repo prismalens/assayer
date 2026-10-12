@@ -53,7 +53,7 @@ assayer review --fail-on major    # exit 4 when anything major or worse is found
 assayer hook install              # opt-in pre-push hook: warns about unreviewed or failing pushes
 ```
 
-The round reviews a snapshot of your working tree in its own checkout, so your files, index and stash are never touched. It prints only; there is nothing to post to. Local review runs on Codex for now.
+The round reviews a snapshot of your working tree in its own checkout, so your files, index and stash are never touched. It prints only; there is nothing to post to.
 
 The hook never starts a review. It looks for a finished local round covering what you push, warns when there is none or when it found something major, and blocks only with `git config assayer.prepush block` (or `ASSAYER_PREPUSH=block`). `git push --no-verify` skips it.
 
@@ -61,11 +61,25 @@ The hook never starts a review. It looks for a finished local round covering wha
 
 | Flag | Effect |
 | --- | --- |
-| `--engine codex\|claude-code\|opencode` | Which engine runs the round. Codex is the default. |
+| `--engine codex\|claude-code\|opencode` | Which engine runs this round, over your saved default. |
 | `--model M` | The engine's model, when you want something other than its default. |
 | `--post` | Post the findings when the round finishes. |
 | `--again` | Review a head this engine already reviewed. |
 | `--ignore-repo-config` | Review a repository that has `.github/claude-review.yml` with the defaults. |
 | `--out DIR` | Keep the round in a new directory of your choosing. |
+
+## Defaults
+
+The first review on a terminal with no `--engine` asks which installed engine to use and saves the answer to `~/.assayer/config.json`. Without a terminal, in CI or a script, it never asks and uses Codex.
+
+```bash
+assayer config                          # show the defaults
+assayer config set engine claude-code   # or codex, opencode
+assayer config set model <model>        # applies only with the saved engine
+assayer config set fail-on major        # local review exits 4 at or above it
+assayer config unset model
+```
+
+A flag always wins for that round.
 
 `assayer --version` prints the version.

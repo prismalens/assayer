@@ -24,7 +24,7 @@ describe('assayer review (#184)', () => {
   it('prints by default and posts only when asked', () => {
     const o = parseArgs(['review', 'a/b#1']);
     assert.equal(o.post, false);
-    assert.equal(o.engine, 'codex');
+    assert.equal(o.engine, null, 'the engine resolves from flag, then ~/.assayer/config.json, then a one-time pick');
     assert.equal(parseArgs(['review', 'a/b#1', '--post', '--engine', 'opencode']).post, true);
     assert.throws(() => parseArgs(['review', 'a/b#1', '--engine', 'nope']), /unknown engine/);
     assert.throws(() => parseArgs(['review', 'a/b#1', '--bogus']), /unknown argument/);
