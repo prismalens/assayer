@@ -1,0 +1,10 @@
+{
+  "name": "assayer",
+  "version": "0.1.0",
+  "description": "Run an Assayer review round from Claude Code or Codex, and work the findings it posts on a pull request.",
+  "author": {
+    "name": "PrismaLens",
+    "url": "https://github.com/prismalens"
+  },
+  "license": "Apache-2.0"
+}

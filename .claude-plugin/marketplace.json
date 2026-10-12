@@ -1,0 +1,14 @@
+{
+  "name": "assayer",
+  "owner": {
+    "name": "PrismaLens",
+    "url": "https://github.com/prismalens"
+  },
+  "plugins": [
+    {
+      "name": "assayer",
+      "source": "./plugin",
+      "description": "Run an Assayer review round from Claude Code or Codex, and work the findings it posts on a pull request."
+    }
+  ]
+}
