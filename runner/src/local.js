@@ -64,10 +64,11 @@ export function chooseBase(top, { base = null } = {}) {
 }
 
 // `clone --shared` reads the user's objects through alternates, so the dangling snapshot is
-// reachable without fetching and the network is never touched.
+// reachable without fetching and the network is never touched. Symlinks check out as plain
+// files, as in github.js.
 export function localCheckout(top, head, dir) {
   const env = { GIT_LFS_SKIP_SMUDGE: '1', GIT_TERMINAL_PROMPT: '0' };
-  git(path.dirname(dir), ['clone', '-q', '--shared', '--no-checkout', top, dir], { env });
+  git(path.dirname(dir), ['clone', '-q', '--shared', '--no-checkout', '-c', 'core.symlinks=false', top, dir], { env });
   git(dir, ['checkout', '-q', '--detach', head], { env });
 }
 

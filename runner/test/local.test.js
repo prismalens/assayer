@@ -1,7 +1,7 @@
 import { describe, it, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync, readFileSync, existsSync, appendFileSync, mkdirSync, chmodSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, readFileSync, existsSync, appendFileSync, mkdirSync, chmodSync, lstatSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { snapshot, chooseBase, localCheckout, changedFiles, sameTree } from '../src/local.js';
@@ -92,6 +92,18 @@ describe('local mode', () => {
     assert.deepEqual([byName['new.txt'].status, byName['new.txt'].previous_filename], ['renamed', 'old.txt']);
     assert.equal(byName['bin.dat'].patch, undefined);
     assert.equal(sameTree(work, base, base), true);
+  });
+
+  it('checks a symlink out as a plain file holding its target, never a link to follow', () => {
+    const { work } = fixture();
+    const outside = path.join(tmp(), 'secret.txt');
+    writeFileSync(outside, 'CANARY');
+    execFileSync('ln', ['-s', outside, path.join(work, 'link.txt')]);
+    const s = snapshot(work, path.join(tmp(), 'i'));
+    const dir = path.join(tmp(), 'checkout');
+    localCheckout(work, s.head, dir);
+    assert.equal(lstatSync(path.join(dir, 'link.txt')).isSymbolicLink(), false);
+    assert.equal(readFileSync(path.join(dir, 'link.txt'), 'utf8'), outside);
   });
 
   it('builds the manifest from local files without calling gh', async () => {
