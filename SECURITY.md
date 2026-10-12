@@ -41,8 +41,7 @@ Do **not** include real secrets, tokens, or private content in your report.
 Assayer is an open source code reviewer. It runs on the user's machine with their
 own engine sign-in (Codex, Claude Code, or OpenCode) over the Agent Client
 Protocol (ACP). It posts findings on pull requests under the user's own GitHub login
-(`gh`), or through an optional telemetry Worker and dashboard. The engine never
-receives a GitHub credential, and findings post only under the user's own login.
+(`gh`). The engine never receives a GitHub credential.
 
 ## Scope
 
@@ -59,6 +58,4 @@ Reports in these areas are especially valuable:
   reaching GitHub or telemetry payloads rather than being stripped and dropped.
 - **Staging and binary execution** — staging executing a binary brought with the target
   checkout (committed binaries or local dependencies).
-- **Daemon and runner token lifecycle** — job installation tokens surviving past round
-  completion or leaking beyond their lease.
 - **Path traversal** in any file read, checkout staging, or review artifact write.

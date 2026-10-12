@@ -5,14 +5,11 @@ Assayer moved here from `prismalens/gh-workflows` with its history (gh-workflows
 ## Tests
 
 ```bash
-(cd runner && npm ci && npm test)    # first: the Worker imports runner/src/poster.js
-(cd worker && npm ci && npm test)
-(cd dashboard && npm ci && npm test)
+(cd runner && npm ci && npm test)
 ```
 
 ## Pins that move together
 
-- `tools/review-config/schema.json` is the `.github/claude-review.yml` schema; the Worker and the dashboard both import it.
 - `runner/prompt/` is rendered from the Actions lane's template in gh-workflows. `runner/prompt/README.md` has the re-sync rule.
 - `plugin/skills/assayer-review/SKILL.md` describes the CLI in `runner/src/review.js`. A flag, refusal or verdict change edits both.
 

@@ -35,7 +35,7 @@ test('--head-sha defaults to empty, never null: a null reaches manifest.py as th
   assert.notEqual(o.headSha, null);
 });
 
-test('parseArgs takes the daemon\'s credential flags (#184)', () => {
+test('parseArgs takes the credential flags (#184)', () => {
   const base = ['--cwd', '/c', '--prompt', '/p', '--out', '/o'];
   const o = parseArgs([...base, '--credential-env', 'ANTHROPIC_API_KEY', '--credential-fingerprint', 'abcdef012345']);
   assert.equal(o.credentialEnv, 'ANTHROPIC_API_KEY');

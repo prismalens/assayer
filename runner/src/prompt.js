@@ -178,7 +178,7 @@ export function promptHash(template) {
 }
 
 // The round-type tokens the workflow's build-prompt env block sets (claude-code-review.yml),
-// verbatim. scripts/render-prompt.mjs and the daemon both render through this. Re-sync with it.
+// verbatim. scripts/render-prompt.mjs and review.js both render through this. Re-sync with it.
 export function laneTokens({ repo, pr, level = 'medium', mode = 'review', rangeBase = null, rangeHead = null, pathInstructions = false }) {
   const inc = mode === 'incremental'; const full = mode === 'review-full'; const pi = pathInstructions;
   const rb = rangeBase; const rh = rangeHead;

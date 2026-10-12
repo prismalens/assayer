@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // The lane's two comment tools, as one stdio MCP server the runner offers in session/new.
 // Nothing is posted: each call is appended as a JSON line to $ASSAYER_TOOL_LOG and the
-// engine is told it succeeded. The poster in the control plane renders them later.
+// engine is told it succeeded. The poster renders them later.
 // Server name is argv[2]: `github_inline_comment` serves create_inline_comment,
 // `github_comment` serves update_claude_comment, so the engine sees the same
 // mcp__<server>__<tool> names the Actions lane's prompt uses.

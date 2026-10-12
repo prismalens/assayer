@@ -1,5 +1,5 @@
-// assayer/v1: the event stream every engine emits and the control plane consumes.
-// Field lists are the contract in docs/design/self-hosted-review.md section 4.
+// assayer/v1: the event stream every engine emits and the CLI reads.
+// Field lists are the contract (gh-workflows docs/design/self-hosted-review.md, section 4).
 
 export const EVENT_TYPES = Object.freeze([
   'started', 'read', 'agent', 'finding', 'summary', 'usage', 'error', 'finished',
@@ -63,7 +63,7 @@ export function resetAtFrom(text) {
   return m ? m[1].trim() : null;
 }
 
-// The Worker's cooldown runs Date.parse on reset_at, so the runner hands it an ISO instant. A
+// A consumer runs Date.parse on reset_at, so the runner hands it an ISO instant. A
 // clock time ("7:37 PM") is read in the runner's timezone and rolls to tomorrow once passed; a
 // duration ("1h35m27s", "3m") counts from now. Anything else stays raw and the job fails, not waits.
 export function resetAtIso(raw, now = new Date()) {

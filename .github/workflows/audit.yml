@@ -26,9 +26,3 @@ jobs:
 
       - name: Audit runner (fail on high or critical)
         run: npm audit --audit-level=high --prefix runner
-
-      - name: Audit worker (fail on high or critical)
-        run: npm audit --audit-level=high --prefix worker
-
-      - name: Audit dashboard (fail on high or critical)
-        run: npm audit --audit-level=high --prefix dashboard

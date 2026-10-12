@@ -21,7 +21,7 @@ Keep PRs focused and small where you can.
 - [ ] PR is opened against `main`
 - [ ] PR title follows Conventional Commits (`feat:`, `fix:`, `docs:`, ...) — it
       becomes the squashed commit subject
-- [ ] Tests pass locally (`npm test` across runner, worker, and dashboard)
+- [ ] Tests pass locally (`cd runner && npm test`)
 - [ ] Tests added or updated for the change
 - [ ] No secrets, tokens, or private content committed
 - [ ] Breaking config or schema change → called out above

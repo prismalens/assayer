@@ -80,7 +80,7 @@ export const ENGINES = Object.freeze({
   },
 });
 
-// `extraAllow` names one credential variable the daemon handed this round (--credential-env),
+// `extraAllow` names one credential variable the caller handed this round (--credential-env),
 // so a key under a name of the operator's choosing reaches the engine and nothing else does.
 export function engineEnv(row, source = process.env, extraAllow = []) {
   const out = {};

@@ -1,7 +1,7 @@
 {
   "name": "@prismalens/assayer",
   "version": "0.1.0",
-  "description": "Leases review jobs, runs an engine over the Agent Client Protocol, and emits assayer/v1 events.",
+  "description": "Code review on your machine with your own Codex, Claude Code or OpenCode sign-in, posted under your own GitHub login.",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
@@ -25,9 +25,7 @@
     "test": "node --test"
   },
   "bin": {
-    "assayer": "src/review.js",
-    "assayer-run": "src/run.js",
-    "assayer-runner": "src/daemon.js"
+    "assayer": "src/review.js"
   },
   "dependencies": {
     "@agentclientprotocol/sdk": "1.4.0",

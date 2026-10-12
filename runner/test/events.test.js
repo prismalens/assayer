@@ -41,7 +41,7 @@ test('classifyFailure covers the lane vocabulary and falls back to api-error', (
   assert.equal(event('error', { failure_class: 'rate-limited', message: 'x' }).retryable, true);
 });
 
-test('resetAtIso turns a clock time or a duration into an ISO instant the Worker can parse', () => {
+test('resetAtIso turns a clock time or a duration into an ISO instant Date.parse reads', () => {
   const now = new Date(2026, 9, 10, 15, 0, 0);
   assert.equal(resetAtIso('7:37 PM', now), new Date(2026, 9, 10, 19, 37).toISOString());
   assert.equal(resetAtIso('9:00 AM', now), new Date(2026, 9, 11, 9, 0).toISOString(), 'a time already passed rolls to tomorrow');

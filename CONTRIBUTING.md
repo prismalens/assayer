@@ -37,18 +37,14 @@ cd assayer
 
 The repository consists of:
 - `runner/`: the `assayer` CLI and engine runner over ACP
-- `worker/`: Cloudflare Worker for optional telemetry and job coordination
-- `dashboard/`: web console over telemetry
 - `plugin/`: Claude Code and Codex review skill
 
 ## Tests
 
-Run the test suites across each component:
+Run the test suite:
 
 ```bash
 (cd runner && npm ci && npm test)
-(cd worker && npm ci --prefix ../runner --omit=dev && npm ci && npm test)
-(cd dashboard && npm ci && npm test)
 ```
 
 ## Making a change
@@ -62,7 +58,7 @@ Run the test suites across each component:
 
 ## Code style
 
-- Plain JavaScript on Node 24 for the runner and worker; TypeScript and React for the dashboard.
+- Plain JavaScript on Node 24.
 - Preserve existing formatting and indentation.
 - Small, cohesive modules with explicit error handling and no committed credentials.
 

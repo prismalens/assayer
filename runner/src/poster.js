@@ -59,7 +59,7 @@ function headers(token) {
     Authorization: `Bearer ${token}`,
     Accept: "application/vnd.github+json",
     "X-GitHub-Api-Version": "2022-11-28",
-    "User-Agent": "assayer-control-plane",
+    "User-Agent": "assayer",
     "Content-Type": "application/json",
   };
 }

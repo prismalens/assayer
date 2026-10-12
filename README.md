@@ -50,10 +50,7 @@ Every event also carries `product`, how it was installed (`npm` or `checkout`), 
 | Path | What it is |
 | --- | --- |
 | `runner/` | The `assayer` CLI and the engine runner over the Agent Client Protocol |
-| `worker/` | Cloudflare Worker: optional telemetry, and the poster the CLI imports |
-| `dashboard/` | Optional console over the telemetry |
 | `plugin/` | The Claude Code and Codex plugin |
-| `docs/design/` | Architecture and the engine credential research |
 
 ## License
 

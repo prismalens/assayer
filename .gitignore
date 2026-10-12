@@ -1,7 +1,3 @@
 __pycache__/
 *.pyc
-.wrangler/
-
-# The dashboard is built before each deploy, never committed. Story: gh-workflows#46.
-dashboard/dist/
 node_modules/
