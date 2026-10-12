@@ -117,6 +117,7 @@ function gh(args, { allow404 = false } = {}) {
   if (r.error) throw new Error(`gh is not available: ${r.error.message}`);
   if (r.status !== 0) {
     if (allow404 && /HTTP 404/.test(r.stderr)) return null;
+    if (/gh auth login/.test(r.stderr)) throw new Error('the GitHub CLI is not signed in; run `gh auth login`, then try again');
     throw new Error(`gh ${args.slice(0, 2).join(' ')} failed: ${r.stderr.trim().split('\n')[0]}`);
   }
   return r.stdout;
