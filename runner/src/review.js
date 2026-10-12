@@ -5,6 +5,7 @@
 // `assayer publish <dir>` posts, or resumes posting, a round that already ran.
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync, realpathSync } from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ENGINES } from './engines.js';
@@ -300,6 +301,9 @@ async function ensureEngine(engine, interactive) {
   if (!ok) throw new Error(`${LABELS[engine]} is not set up; \`assayer doctor\` lists what is missing`);
 }
 
+// Paths under the home directory print as ~/…, the way people type them.
+const tilde = (p) => (p.startsWith(os.homedir() + path.sep) ? `~${p.slice(os.homedir().length)}` : p);
+
 // A bare round name, as review prints it, is looked up among the kept rounds.
 export function roundDir(arg, home = assayerHome()) {
   const kept = path.join(home, 'reviews', arg);
@@ -341,7 +345,7 @@ export async function reviewLocal(o, { log = (s) => process.stderr.write(s + '\n
   writeFileSync(path.join(dir, 'prompt.md'), prompt.text);
   const round = { mode: 'local', repository: null, pr_number: null, local_path: top, head_sha: snap.head, head_tree: snap.tree, base_sha: base.sha, base_source: base.source, dirty: snap.dirty, engine: o.engine, model: o.model, where: 'local' };
   writeFileSync(path.join(dir, 'round.json'), JSON.stringify(round, null, 2) + '\n');
-  log(`assayer: local changes in ${label}, ${snap.dirty ? 'working tree' : snap.head.slice(0, 7)} vs ${base.sha.slice(0, 7)} from ${base.source}, with ${o.engine}; round in ${dir}`);
+  log(`assayer: local changes in ${label}, ${snap.dirty ? 'working tree' : snap.head.slice(0, 7)} vs ${base.sha.slice(0, 7)} from ${base.source}, with ${o.engine}; round in ${tilde(dir)}`);
   const summary = await watched(dir, o.engine, log, (log) => runRound({
     cwd: checkoutDir, prompt: path.join(dir, 'prompt.md'), out: dir, engine: o.engine, model: o.model, promptHash: prompt.hash,
     stage: true, repo, pr: '0', headSha: snap.head, baseSha: base.sha, mode: 'review', ghToken: '', engineGh: 'offline',
@@ -352,7 +356,7 @@ export async function reviewLocal(o, { log = (s) => process.stderr.write(s + '\n
   if (summary.conclusion !== 'completed') return { dir, summary, posted: null, blocking: false };
   const { findings } = readFindings(dir);
   const counts = Object.fromEntries(SEVERITIES.map((x) => [x, findings.filter((f) => severityOf(f.body) === x).length]));
-  log(`assayer: ${findings.length} finding(s) (${counts.critical} critical, ${counts.major} major, ${counts.minor} minor), ${snap.dirty ? `working tree on ${localGit(top, ['rev-parse', '--short', 'HEAD'])}` : snap.head.slice(0, 7)} vs ${base.sha.slice(0, 7)} from ${base.source}; round in ${dir}`);
+  log(`assayer: ${findings.length} finding(s) (${counts.critical} critical, ${counts.major} major, ${counts.minor} minor), ${snap.dirty ? `working tree on ${localGit(top, ['rev-parse', '--short', 'HEAD'])}` : snap.head.slice(0, 7)} vs ${base.sha.slice(0, 7)} from ${base.source}; round in ${tilde(dir)}`);
   return { dir, summary, posted: null, blocking: atOrAbove(findings, o.failOn) };
 }
 
@@ -379,7 +383,7 @@ export async function review(o, { log = (s) => process.stderr.write(s + '\n') } 
   mkdirSync(dir, { recursive: true });
   const token = gh(['auth', 'token']).trim();
   const cwd = path.join(dir, 'checkout');
-  log(`assayer: ${o.repo}#${o.pr} at ${headSha.slice(0, 7)} with ${o.engine}; round in ${dir}`);
+  log(`assayer: ${o.repo}#${o.pr} at ${headSha.slice(0, 7)} with ${o.engine}; round in ${tilde(dir)}`);
   await checkout({ repository: o.repo, headSha, baseSha, token, dir: cwd });
 
   const prompt = renderFor(o.engine, { repo: o.repo, pr: o.pr, baseSha, headSha });
