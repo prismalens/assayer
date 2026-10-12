@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="420" viewBox="0 0 1280 420" role="img" aria-labelledby="t d">
+  <title id="t">Assayer</title>
+  <desc id="d">Assayer reviews a pull request on your machine, posts a finding inline under your login, and resolves the thread once the fix is verified.</desc>
+  <rect width="1280" height="420" fill="#faf7f0"/>
+  <g stroke="#efe9dc" stroke-width="1">
+    <line x1="40" y1="0" x2="40" y2="420"/><line x1="80" y1="0" x2="80" y2="420"/><line x1="120" y1="0" x2="120" y2="420"/><line x1="160" y1="0" x2="160" y2="420"/><line x1="200" y1="0" x2="200" y2="420"/><line x1="240" y1="0" x2="240" y2="420"/><line x1="280" y1="0" x2="280" y2="420"/><line x1="320" y1="0" x2="320" y2="420"/><line x1="360" y1="0" x2="360" y2="420"/><line x1="400" y1="0" x2="400" y2="420"/><line x1="440" y1="0" x2="440" y2="420"/><line x1="480" y1="0" x2="480" y2="420"/><line x1="520" y1="0" x2="520" y2="420"/><line x1="560" y1="0" x2="560" y2="420"/><line x1="600" y1="0" x2="600" y2="420"/><line x1="640" y1="0" x2="640" y2="420"/><line x1="680" y1="0" x2="680" y2="420"/><line x1="720" y1="0" x2="720" y2="420"/><line x1="760" y1="0" x2="760" y2="420"/><line x1="800" y1="0" x2="800" y2="420"/><line x1="840" y1="0" x2="840" y2="420"/><line x1="880" y1="0" x2="880" y2="420"/><line x1="920" y1="0" x2="920" y2="420"/><line x1="960" y1="0" x2="960" y2="420"/><line x1="1000" y1="0" x2="1000" y2="420"/><line x1="1040" y1="0" x2="1040" y2="420"/><line x1="1080" y1="0" x2="1080" y2="420"/><line x1="1120" y1="0" x2="1120" y2="420"/><line x1="1160" y1="0" x2="1160" y2="420"/><line x1="1200" y1="0" x2="1200" y2="420"/><line x1="1240" y1="0" x2="1240" y2="420"/>
+  </g>
+  <rect x="0" y="0" width="1280" height="420" fill="#faf7f0" opacity="0.55"/>
+  <!-- touchstone streak: the assayer's mark -->
+  <path d="M74 306 C 140 296, 210 304, 300 292" stroke="#a8740f" stroke-width="6" stroke-linecap="round" fill="none" opacity="0.9"/>
+  <text x="72" y="190" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="84" font-weight="700" fill="#1d2031" letter-spacing="-2">assayer</text>
+  <text x="76" y="236" font-family="-apple-system, Segoe UI, Helvetica, Arial, sans-serif" font-size="25" fill="#1d2031">Code review that runs on your machine,</text>
+  <text x="76" y="268" font-family="-apple-system, Segoe UI, Helvetica, Arial, sans-serif" font-size="25" fill="#1d2031">posts as you, and closes what you fixed.</text>
+  <text x="76" y="344" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="17" fill="#5d6278">$ assayer review owner/repo#42 --post</text>
+  <text x="76" y="372" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="17" fill="#5d6278">Codex · Claude Code · OpenCode — your own sign-in</text>
+
+  <g transform="translate(700 52)">
+    <rect width="520" height="316" rx="10" fill="#ffffff" stroke="#e4ded0"/>
+    <text x="20" y="34" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="14" fill="#5d6278">src/events.js</text>
+    <line x1="0" y1="50" x2="520" y2="50" stroke="#e4ded0"/>
+    <rect x="0" y="58" width="520" height="26" fill="#fbe4e7"/>
+    <text x="20" y="76" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="14" fill="#b42336">- return new Date(now + ms).toISOString();</text>
+    <rect x="0" y="86" width="520" height="26" fill="#e3f4e8"/>
+    <text x="20" y="104" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="14" fill="#1f7a45">+ const at = new Date(now + ms);</text>
+    <rect x="0" y="114" width="520" height="26" fill="#e3f4e8"/>
+    <text x="20" y="132" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="14" fill="#1f7a45">+ return isNaN(at) ? s : at.toISOString();</text>
+
+    <rect x="20" y="156" width="480" height="84" rx="8" fill="#f6e7c6" stroke="#a8740f"/>
+    <circle cx="44" cy="180" r="10" fill="#a8740f"/>
+    <text x="62" y="185" font-family="-apple-system, Segoe UI, Helvetica, Arial, sans-serif" font-size="15" font-weight="600" fill="#1d2031">you · Stability · Minor</text>
+    <text x="40" y="214" font-family="-apple-system, Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#1d2031">A huge duration makes an Invalid Date, and</text>
+    <text x="40" y="232" font-family="-apple-system, Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#1d2031">toISOString() throws out of the error handler.</text>
+
+    <rect x="20" y="254" width="480" height="44" rx="8" fill="none" stroke="#e4ded0"/>
+    <path d="M38 276 l7 7 l13 -15" stroke="#1f7a45" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="70" y="282" font-family="-apple-system, Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#1d2031">Verified fixed in 7f6575d. Thread resolved.</text>
+  </g>
+</svg>
