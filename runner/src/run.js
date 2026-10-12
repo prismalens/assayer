@@ -181,7 +181,7 @@ export async function runRound(opts, { log = (s) => process.stderr.write(s + '\n
       if (Array.isArray(init.authMethods) && init.authMethods.length && init._meta?.authenticated === false) {
         throw Object.assign(new Error('agent requires authentication: ' + init.authMethods.map((m) => m.id).join(', ')), { stage: 'initialize' });
       }
-      return ctx.buildSession(cwd)
+      return ctx.buildSession({ cwd, mcpServers: [], ...(row.sessionMeta ? { _meta: row.sessionMeta } : {}) })
         .withMcpServer(mcpServer('github_inline_comment', toolLog))
         .withMcpServer(mcpServer('github_comment', toolLog))
         .withSession(async (session) => {
