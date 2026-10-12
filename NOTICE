@@ -1,0 +1,8 @@
+Assayer
+Copyright 2026 Sumit Patel
+
+This product includes software developed as part of the Assayer project
+(https://github.com/prismalens/assayer).
+
+Releases bundle third-party software into the web dashboard. Its licences
+are listed in THIRD_PARTY_NOTICES.txt, next to this file in the npm package.

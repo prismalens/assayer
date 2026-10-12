@@ -58,3 +58,5 @@ Every event also carries `product`, how it was installed (`npm` or `checkout`), 
 ## License
 
 Apache-2.0. See `LICENSE`.
+
+Contributing: see CONTRIBUTING.md. Security reports: see SECURITY.md.
