@@ -88,3 +88,10 @@ test('an apostrophe in a single-quoted body, and a word Codex quotes in mixed st
   assert.equal(word("\"gh pr view 8 \"\"$(id)\""), false);
   assert.equal(word("\"gh pr view 8 \"'`id`'"), false);
 });
+
+test('keeps read-anywhere and code-running forms of git, rg, sed and cat refused', () => {
+  for (const c of ['git diff --output=/tmp/x', 'git -c core.pager=sh diff', 'git diff --ext-diff', 'rg --pre=sh x', 'sed -n 1w/tmp/x a.js', 'cat /home/u/.config/gh/hosts.yml']) {
+    assert.equal(commandAllowed(c), false, c);
+  }
+  assert.equal(decide({ kind: 'execute', rawInput: { command: 'git show HEAD' } }).allow, false);
+});

@@ -77,9 +77,11 @@ export const ENGINES = Object.freeze({
       'CLAUDE_CODE_USE_BEDROCK', 'CLAUDE_CODE_USE_VERTEX', 'CLAUDE_CODE_USE_FOUNDRY'],
     credentialKinds: ['api-key', 'bedrock', 'vertex', 'foundry', 'user-login'],
     admitted: null, // prismalens#639 passes the gate; no admission record in this repo yet
-    // No user, project or local settings: the user's hooks, plugins and CLAUDE.md stay out of
-    // the round, as Codex's plugins and OpenCode's --pure do. A user hook stamped a local round.
-    sessionMeta: { claudeCode: { options: { settingSources: [] } } },
+    // No user settings, hooks, plugins or CLAUDE.md, and no reads outside the checkout. The adapter
+    // starts in the user's own defaultMode ("auto" ran shell unasked), so the round sets Always ask
+    // and every gated call reaches the policy (planner ruling, run-plan 2026-10-13).
+    sessionMeta: { claudeCode: { options: { settingSources: [], settings: { permissions: { blockReadsOutsideWorkingDirectories: true } } } } },
+    sessionMode: 'default',
     prepare({ model, env }) {
       return { ...env, CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: '1', ...(model ? { ANTHROPIC_MODEL: model } : {}) };
     },

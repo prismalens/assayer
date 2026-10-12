@@ -188,6 +188,11 @@ export async function runRound(opts, { log = (s) => process.stderr.write(s + '\n
           mapper.sessionId = session.sessionId;
           raw('session', { sessionId: session.sessionId, response: session.newSessionResponse ?? null });
           mapper.onSession(session.newSessionResponse);
+          if (row.sessionMode) {
+            await ctx.request(acp.methods.agent.session.setMode, { sessionId: session.sessionId, modeId: row.sessionMode })
+              .catch((e) => { throw Object.assign(e, { stage: 'session' }); });
+            raw('set_mode', { modeId: row.sessionMode });
+          }
           const p = session.prompt(promptText);
           p.catch(() => {}); // surfaced through nextUpdate's stop or thrown below
           for (;;) {
