@@ -1,0 +1,61 @@
+# The packed tarball, installed globally on each OS, must start: a global install runs the
+# CLI through a bin shim, which only an installed copy exercises.
+name: Cross-OS smoke
+
+on:
+  pull_request:
+    paths:
+      - runner/**
+      - .github/workflows/cross-os-smoke.yml
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1  # v7.1.0
+        with:
+          node-version: 24
+
+      - name: Pack
+        working-directory: runner
+        run: echo "TARBALL=$PWD/$(npm pack --silent | tail -1)" >> "$GITHUB_ENV"
+
+      - name: Install globally from the tarball
+        run: npm i -g "$TARBALL"
+
+      - name: The installed command starts
+        run: |
+          set -euo pipefail
+          want="$(node -p "require('./runner/package.json').version")"
+          got="$(assayer --version)"
+          [ "$got" = "$want" ] || { echo "::error::assayer --version printed '$got', expected '$want'"; exit 1; }
+          set +e
+          assayer > usage.txt 2>&1; code=$?
+          set -e
+          [ "$code" = 2 ] && grep -q "assayer review" usage.txt || { echo "::error::bare assayer exited $code"; cat usage.txt; exit 1; }
+
+      # No engine is installed on a runner, so doctor must say not ready and exit 1.
+      - name: Doctor reports this machine
+        run: |
+          set +e
+          ASSAYER_TELEMETRY=off assayer doctor > doctor.txt; code=$?
+          set -e
+          cat doctor.txt
+          grep -q "node" doctor.txt && [ "$code" = 1 ]
