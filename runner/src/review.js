@@ -274,6 +274,13 @@ export function terminalMarkdown(md, tty) {
   }).join('\n');
 }
 
+// An engine refused a command can give up filing; zero findings then is not a clean bill.
+export function refusalNote(s) {
+  const n = s.permissions?.rejected ?? 0;
+  if (!n || (s.findings ?? 0) > 0) return [];
+  return [`  note: the engine was refused ${n} command${n === 1 ? '' : 's'} outside Assayer's allowlist and filed nothing; if the summary below describes problems, run the review again or with another engine`];
+}
+
 // Most severe first; the engine's filing order breaks ties.
 const SEV_STYLE = { critical: ['Critical', 31], major: ['Major', 33], minor: ['Minor', 36] };
 
@@ -321,6 +328,7 @@ function printRound(dir) {
   }
   const lines = [`${s.conclusion}: ${s.findings ?? 0} finding(s) in ${Math.round((s.wall_clock_ms ?? 0) / 1000)}s`];
   lines.push(...findingLines(findings, { tty: Boolean(process.stdout.isTTY) }));
+  lines.push(...refusalNote(s));
   const summary = events.findLast((e) => e.type === 'summary');
   if (summary) lines.push('', terminalMarkdown(withoutEngineCredit(summary.body), Boolean(process.stdout.isTTY)));
   process.stdout.write(lines.join('\n') + '\n');

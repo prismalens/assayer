@@ -25,3 +25,14 @@ it('refuses an inline finding off the diff, names the lines, and records only th
     assert.equal(readFileSync(log, 'utf8').trim().split('\n').length, 1);
   } finally { await client.close(); }
 });
+
+it('tells the engine that no commit id is needed', async () => {
+  const client = new Client({ name: 'test', version: '0' });
+  await client.connect(new StdioClientTransport({ command: process.execPath, args: [SERVER, 'github_inline_comment'], env: { ...process.env, ASSAYER_TOOL_LOG: path.join(mkdtempSync(path.join(os.tmpdir(), 'assayer-ft-')), 'log') } }));
+  try {
+    const { tools } = await client.listTools();
+    const t = tools.find((x) => x.name === 'create_inline_comment');
+    assert.match(t.description, /no commit id is needed/);
+    assert.match(t.inputSchema.properties.commitId.description, /Leave this out/);
+  } finally { await client.close(); }
+});

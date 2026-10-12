@@ -37,16 +37,17 @@ const server = new McpServer({ name: which, version: '0.0.0' });
 
 if (which === 'github_inline_comment') {
   server.registerTool('create_inline_comment', {
-    description: 'Create an inline review comment on a specific line or range of the pull request diff.',
+    // Engines reached for `git rev-parse HEAD` to fill commitId, were refused, and filed nothing.
+    description: 'Create an inline review comment on a specific line or range of the pull request diff. Assayer anchors every comment on the head commit itself; no commit id is needed.',
     inputSchema: {
-      path: z.string(),
+      path: z.string().describe('File path relative to the repository root, as in the diff.'),
       body: z.string(),
-      line: z.number().int().optional(),
-      startLine: z.number().int().optional(),
+      line: z.number().int().optional().describe('Last line of the range, in the new file (RIGHT) unless side is LEFT.'),
+      startLine: z.number().int().optional().describe('First line of a multi-line range, in the same hunk as line.'),
       side: z.enum(['LEFT', 'RIGHT']).optional(),
       startSide: z.enum(['LEFT', 'RIGHT']).optional(),
       subjectType: z.string().optional(),
-      commitId: z.string().optional(),
+      commitId: z.string().optional().describe('Leave this out: Assayer uses the head commit.'),
     },
   }, async (input) => {
     // Refused at filing time, as GitHub refuses it at posting time, so the engine re-files on a

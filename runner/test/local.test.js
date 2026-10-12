@@ -197,4 +197,11 @@ describe('local prompt and CLI', () => {
     const [line] = failureLines({ engine: 'codex', conclusion: 'refused', refused_size: true, errors: [] }, dir);
     assert.match(line, /smaller commits with --head, or push it and review the pull request with --full/);
   });
+
+  it('flags zero findings after refused commands instead of implying a clean result', async () => {
+    const { refusalNote } = await import('../src/review.js');
+    assert.match(refusalNote({ findings: 0, permissions: { rejected: 1 } })[0], /refused 1 command outside/);
+    assert.deepEqual(refusalNote({ findings: 2, permissions: { rejected: 3 } }), []);
+    assert.deepEqual(refusalNote({ findings: 0, permissions: { rejected: 0 } }), []);
+  });
 });

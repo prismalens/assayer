@@ -148,6 +148,14 @@ export async function runRound(opts, { log = (s) => process.stderr.write(s + '\n
   const started = Date.now();
   let conclusion = null; let permissions = { allowed: 0, rejected: 0 };
   let timer = null; let idle = null; let timedOut = false;
+  // A subagent's work sends the parent no updates; an open tool call is activity, not idleness.
+  // The wall clock still bounds the round (a free model's subagents ran past 8 quiet minutes).
+  const open = new Set();
+  const track = (u) => {
+    if (!u?.toolCallId || (u.sessionUpdate !== 'tool_call' && u.sessionUpdate !== 'tool_call_update')) return;
+    if (u.status === 'completed' || u.status === 'failed') open.delete(u.toolCallId);
+    else if (u.sessionUpdate === 'tool_call' || u.status) open.add(u.toolCallId);
+  };
 
   const stream = acp.ndJsonStream(Writable.toWeb(child.stdin), Readable.toWeb(child.stdout));
   const app = acp.client({ name: 'assayer-runner' })
@@ -175,7 +183,11 @@ export async function runRound(opts, { log = (s) => process.stderr.write(s + '\n
         setTimeout(() => child.kill('SIGKILL'), 5000).unref();
       };
       timer = setTimeout(() => cancel('wall-clock'), opts.timeoutMs);
-      idle = setTimeout(() => cancel('idle'), opts.idleMs);
+      const onIdle = () => {
+        if (open.size) { raw('idle_deferred', { open: open.size }); idle = setTimeout(onIdle, opts.idleMs); return; }
+        cancel('idle');
+      };
+      idle = setTimeout(onIdle, opts.idleMs);
       const init = await ctx.request(acp.methods.agent.initialize, { protocolVersion: acp.PROTOCOL_VERSION, clientCapabilities: {} });
       raw('initialize', { result: init });
       mapper.events[0]._meta = { agent: init.agentInfo ?? null, protocol: init.protocolVersion, staged };
@@ -201,7 +213,8 @@ export async function runRound(opts, { log = (s) => process.stderr.write(s + '\n
             if (m.kind === 'stop') { raw('stop', { response: m.response }); mapper.onStop(m.response); return m.response; }
             const n = m.notification ?? m.update ?? m;
             raw('update', { notification: n });
-            clearTimeout(idle); idle = setTimeout(() => cancel('idle'), opts.idleMs);
+            track(n.update ?? n);
+            clearTimeout(idle); idle = setTimeout(onIdle, opts.idleMs);
             mapper.onUpdate(n.update ?? n);
           }
         });
