@@ -193,7 +193,35 @@ export function withheldCount(summary) {
   return dropped + (summary.tool_log_corrupt_lines ?? 0);
 }
 
-export async function publish(dir, { log = (s) => process.stderr.write(s + '\n'), fetch = globalThis.fetch, token = null, login = null } = {}) {
+// GitHub through a flaky network: a read is retried on any network error or a 502/503/504; a
+// write only when the connection never opened, since a write that reached GitHub must not repeat.
+const NEVER_CONNECTED = new Set(['ENOTFOUND', 'EAI_AGAIN', 'ECONNREFUSED', 'UND_ERR_CONNECT_TIMEOUT', 'ENETUNREACH']);
+export function retryingFetch(inner = globalThis.fetch, { tries = 3, wait = (ms) => new Promise((r) => setTimeout(r, ms)) } = {}) {
+  return async (url, init = {}) => {
+    const read = (init.method ?? 'GET') === 'GET';
+    for (let i = 1; ; i += 1) {
+      try {
+        const res = await inner(url, init);
+        if (read && i < tries && [502, 503, 504].includes(res.status)) { await wait(1000 * 3 ** (i - 1)); continue; }
+        return res;
+      } catch (e) {
+        if (i >= tries || !(read || NEVER_CONNECTED.has(e?.cause?.code))) throw e;
+        await wait(1000 * 3 ** (i - 1));
+      }
+    }
+  };
+}
+
+export async function publish(dir, opts = {}) {
+  try {
+    return await publishOnce(dir, { ...opts, fetch: retryingFetch(opts.fetch ?? globalThis.fetch) });
+  } catch (e) {
+    if (e?.message !== 'fetch failed') throw e;
+    throw new Error(`could not reach GitHub (${e.cause?.code ?? e.cause?.message ?? 'network error'}). What was posted is recorded; \`assayer publish ${path.basename(dir)}\` posts the rest`);
+  }
+}
+
+async function publishOnce(dir, { log = (s) => process.stderr.write(s + '\n'), fetch = globalThis.fetch, token = null, login = null } = {}) {
   const round = JSON.parse(readFileSync(path.join(dir, 'round.json'), 'utf8'));
   if (round.mode === 'local') throw new Error('a local round has nothing to post to; push and review the pull request');
   const events = readFileSync(path.join(dir, 'events.jsonl'), 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l));

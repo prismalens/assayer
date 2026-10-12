@@ -74,3 +74,17 @@ describe('assayer review (#184)', () => {
     assert.match(readFileSync(path.join(dir, 'publish-journal.jsonl'), 'utf8'), /"find\n\{"key":"finding:1"/);
   });
 });
+
+describe('posting through a flaky network', () => {
+  const fail = (code) => Object.assign(new TypeError('fetch failed'), { cause: { code } });
+  it('retries a read, and a write only when it never connected', async () => {
+    const { retryingFetch } = await import('../src/review.js');
+    const calls = [];
+    const flaky = (errs) => async (url, init) => { calls.push(init?.method ?? 'GET'); const e = errs.shift(); if (e) throw e; return { status: 200 }; };
+    const nowait = { wait: async () => {} };
+    assert.equal((await retryingFetch(flaky([fail('ECONNRESET')]), nowait)('u')).status, 200);
+    assert.equal((await retryingFetch(flaky([fail('ENOTFOUND')]), nowait)('u', { method: 'POST' })).status, 200);
+    await assert.rejects(retryingFetch(flaky([fail('ECONNRESET')]), nowait)('u', { method: 'POST' }), /fetch failed/);
+    await assert.rejects(retryingFetch(flaky([fail('X'), fail('X'), fail('X')]), nowait)('u'), /fetch failed/);
+  });
+});
