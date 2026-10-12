@@ -5,8 +5,8 @@ Assayer moved here from `prismalens/gh-workflows` with its history (gh-workflows
 ## Tests
 
 ```bash
-(cd worker && npm ci && npm test)    # first: the runner imports worker/poster.js
-(cd runner && npm ci && npm test)
+(cd runner && npm ci && npm test)    # first: the Worker imports runner/src/poster.js
+(cd worker && npm ci && npm test)
 (cd dashboard && npm ci && npm test)
 ```
 

@@ -4,7 +4,7 @@
 // Spawns python3 against a checkout with the same env vars those two steps set, then reads back
 // the .claude-review-manifest.json and .claude-review.diff the script wrote into that checkout.
 import { spawn } from 'node:child_process';
-import { existsSync, statSync, readFileSync } from 'node:fs';
+import { existsSync, statSync, readFileSync, realpathSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -167,7 +167,7 @@ function parseCliArgs(argv) {
   return o;
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {
   let opts;
   try { opts = parseCliArgs(process.argv.slice(2)); } catch (e) { process.stderr.write(`manifest: ${e.message}\n`); process.exit(2); }
   buildManifest({

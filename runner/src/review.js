@@ -4,7 +4,7 @@
 // No control plane: identity follows where the round runs (#184, 2026-10-11 decision).
 // `assayer publish <dir>` posts, or resumes posting, a round that already ran.
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync, realpathSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -12,7 +12,7 @@ import { ENGINES } from './engines.js';
 import { renderPrompt, renderCodexPrompt, promptHash, laneTokens } from './prompt.js';
 import { checkout } from './github.js';
 import { runRound } from './run.js';
-import { LIVENESS_PREFIX, postRound } from '../../worker/poster.js';
+import { LIVENESS_PREFIX, postRound } from './poster.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const USAGE = `usage:
@@ -217,7 +217,7 @@ export async function review(o, { log = (s) => process.stderr.write(s + '\n') } 
   return { dir, summary, posted: await publish(dir, { log, token }) };
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {
   let o;
   try { o = parseArgs(process.argv.slice(2)); } catch (e) { process.stderr.write(`${e.message}\n`); process.exit(2); }
   const run = o.cmd === 'publish' ? publish(path.resolve(o.dir)).then(() => 0) : review(o).then((r) => (r.summary.conclusion === 'completed' ? 0 : 3));

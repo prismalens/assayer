@@ -2,16 +2,18 @@
 
 Open source code review that runs on your machine with your own Codex, Claude Code or OpenCode sign-in. It posts findings on the pull request under your own GitHub login, and on the next round re-checks its own threads and resolves the ones you fixed. There is no hosted service and no extra API key.
 
-Status: alpha. Install is from a checkout until the first npm release.
+Status: alpha. Until the first npm release, install from a checkout.
 
 ## Install
 
 ```bash
 git clone https://github.com/prismalens/assayer && cd assayer
-(cd worker && npm ci --omit=dev) && cd runner && npm ci && npm link
+cd runner && npm ci && npm link
 npm i -g @openai/codex@0.162.1 @agentclientprotocol/codex-acp@2.1.1 && codex login    # the default engine
 gh auth login
 ```
+
+After the first release the first two lines become `npm i -g @prismalens/assayer`. Either way you need Node 24 or newer, `git`, `python3`, `gh` and one engine signed in.
 
 ## Review a pull request
 

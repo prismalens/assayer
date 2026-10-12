@@ -5,7 +5,7 @@
 // call), events.jsonl (assayer/v1) and summary.json (turns, usage, wall clock) to --out.
 // Exit code: 0 completed, 3 engine error, 4 timed out, 2 usage.
 import { spawn } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync, statSync, copyFileSync, chmodSync, accessSync, constants } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync, statSync, copyFileSync, chmodSync, accessSync, constants, realpathSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Writable, Readable } from 'node:stream';
@@ -228,7 +228,7 @@ export async function runRound(opts, { log = (s) => process.stderr.write(s + '\n
   return summary;
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {
   let opts;
   try { opts = parseArgs(process.argv.slice(2)); } catch (e) { process.stderr.write(`assayer-run: ${e.message}\n`); process.exit(2); }
   runRound(opts).then((s) => process.exit(s.conclusion === 'completed' ? 0 : s.conclusion === 'timed-out' ? 4 : 3))

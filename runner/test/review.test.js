@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { parseArgs, parseTarget, livenessRecords, priorReview, publish, fileJournal, withheldCount } from '../src/review.js';
 import { readFileSync } from 'node:fs';
-import { LIVENESS_PREFIX, livenessBody } from '../../worker/poster.js';
+import { LIVENESS_PREFIX, livenessBody } from '../src/poster.js';
 
 const HEAD = 'a'.repeat(40);
 const live = (over = {}) => ({
