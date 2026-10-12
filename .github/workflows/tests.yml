@@ -1,8 +1,8 @@
 name: Tests
 
 on:
+  # Every base, so a pull request stacked on another one is tested too.
   pull_request:
-    branches: [main]
   push:
     branches: [main]
 
