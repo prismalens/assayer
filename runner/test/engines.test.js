@@ -16,3 +16,13 @@ describe('engine rows', () => {
     assert.equal(ENGINES.opencode.sessionMode, undefined);
   });
 });
+
+describe('Codex credential paths', () => {
+  it('denies where credentials live and leaves its own sign-in readable', () => {
+    const cfg = JSON.parse(ENGINES.codex.prepare({ env: {} }).CODEX_CONFIG);
+    const fs = cfg.permissions[cfg.default_permissions].filesystem;
+    for (const p of ['~/.config/gh', '~/.ssh', '~/.aws', '~/.claude/.credentials.json']) assert.equal(fs[p], 'deny', p);
+    assert.equal(Object.keys(fs).some((p) => p.startsWith('~/.codex')), false);
+    assert.equal(cfg.sandbox_mode, undefined, 'a sandbox_mode would switch Codex back to the legacy settings and drop the profile');
+  });
+});

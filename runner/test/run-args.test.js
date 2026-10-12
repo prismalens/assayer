@@ -60,7 +60,9 @@ test('the codex row: read-only mode, no plugins, the model in CODEX_CONFIG, the 
   const env = row.prepare({ model: 'gpt-6.1-sol', outDir: '/tmp/x', env: base });
   assert.equal(env.INITIAL_AGENT_MODE, 'read-only');
   assert.equal(env.CODEX_HOME, '/h/.codex');
-  assert.deepEqual(JSON.parse(env.CODEX_CONFIG), { web_search: 'disabled', project_doc_max_bytes: 0, model_reasoning_effort: 'xhigh', features: { plugins: false }, model: 'gpt-6.1-sol' });
+  const { default_permissions: dp, permissions, ...cfg } = JSON.parse(env.CODEX_CONFIG);
+  assert.deepEqual(cfg, { web_search: 'disabled', project_doc_max_bytes: 0, model_reasoning_effort: 'xhigh', features: { plugins: false }, model: 'gpt-6.1-sol' });
+  assert.equal(permissions[dp].filesystem['~/.config/gh'], 'deny');
   assert.equal(JSON.parse(row.prepare({ model: null, env: {} }).CODEX_CONFIG).model, undefined);
 });
 

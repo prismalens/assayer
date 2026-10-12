@@ -19,11 +19,11 @@ The engine runs as your user. Where the engine has a control for it, Assayer kee
 |---|---|---|
 | Claude Code | Refused: reads outside the working directory are blocked, and the session runs in Always ask mode, so each shell command it asks for goes through Assayer's allowlist. | Refused |
 | OpenCode | Refused: `external_directory` is denied. | Refused |
-| Codex | Readable through its shell. Codex's read-only sandbox blocks writes and network, not reads. | Refused by the sandbox |
+| Codex | Readable through its shell, except where credentials live: gh's config, SSH, cloud CLIs, Docker, npm and git credentials, GnuPG, and the Claude Code and OpenCode sign-ins, which Codex's sandbox refuses. Codex cannot be kept to the checkout through its adapter today. | Refused by the sandbox |
 
 Each row is what a canary measured on 2026-10-13: marker files outside the checkout, a symlink to one, a subagent read, `cat`, `gh auth status` and `curl`.
 
-If `gh auth status` shows your token in a file rather than a keyring (common on Linux and WSL), an engine that can read outside the checkout can read that token. Assayer drops a finding or summary that looks like a credential, but it cannot recognise an encoded one. For a pull request from someone you do not trust, review with Claude Code or OpenCode.
+gh keeps its token in a file when there is no keyring (common on Linux and WSL); every engine is refused that file. Assayer drops a finding or summary that looks like a credential, but it cannot recognise an encoded one. Codex can still read the rest of your files, so for a pull request from someone you do not trust, review with Claude Code or OpenCode.
 
 ## After the review
 

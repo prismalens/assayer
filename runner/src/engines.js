@@ -6,6 +6,13 @@ import path from 'node:path';
 // Env is an allowlist per row, never the runner's whole environment (prismalens#169).
 const BASE_ENV = ['PATH', 'HOME', 'LANG', 'TERM', 'TMPDIR', 'NODE_OPTIONS'];
 
+// Codex's read-only mode reads the whole disk, and codex-acp's per-turn policy drops any narrower
+// allow, but keeps deny entries. So the default engine is kept out of where credentials live.
+export const CODEX_DENY = Object.freeze(Object.fromEntries([
+  '~/.config/gh', '~/.ssh', '~/.aws', '~/.azure', '~/.config/gcloud', '~/.kube', '~/.docker', '~/.npmrc', '~/.netrc',
+  '~/.git-credentials', '~/.config/git/credentials', '~/.gnupg', '~/.claude/.credentials.json', '~/.local/share/opencode/auth.json',
+].map((p) => [p, 'deny'])));
+
 export const ENGINES = Object.freeze({
   opencode: {
     command: 'opencode',
@@ -66,7 +73,10 @@ export const ENGINES = Object.freeze({
     prepare({ model, env }) {
       return {
         ...env, INITIAL_AGENT_MODE: 'read-only', NO_BROWSER: '1',
-        CODEX_CONFIG: JSON.stringify({ web_search: 'disabled', project_doc_max_bytes: 0, model_reasoning_effort: 'xhigh', features: { plugins: false }, ...(model ? { model } : {}) }),
+        CODEX_CONFIG: JSON.stringify({
+          web_search: 'disabled', project_doc_max_bytes: 0, model_reasoning_effort: 'xhigh', features: { plugins: false }, ...(model ? { model } : {}),
+          default_permissions: 'assayer', permissions: { assayer: { filesystem: { glob_scan_max_depth: 3, ':minimal': 'read', ...CODEX_DENY } } },
+        }),
       };
     },
   },
