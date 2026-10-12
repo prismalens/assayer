@@ -22,8 +22,7 @@ remain closed. Nothing is required of you until then.
 
 ## Ground rules
 
-- **The trunk branch is `main`, and it is protected.** Every change lands
-  through a pull request; direct pushes to trunk are not allowed.
+- **The trunk branch is `main`.** Every change lands through a pull request.
 - **Never commit secrets.** No API keys, tokens, or private credentials.
 - Keep PRs focused: one logical change per PR makes review fast.
 

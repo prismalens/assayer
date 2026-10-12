@@ -25,7 +25,7 @@ Please include:
 
 - A description of the issue and its impact.
 - Steps to reproduce or a proof of concept.
-- The Assayer version (`assayer --version` or package version), how you installed it, the engine used, and your OS.
+- The Assayer version (`npm ls -g @prismalens/assayer`, or the commit of your checkout), how you installed it, the engine used, and your OS.
 - Any suggested remediation, if you have one.
 
 Do **not** include real secrets, tokens, or private content in your report.

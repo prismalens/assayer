@@ -11,8 +11,7 @@ milestone progress, not a stability promise.
 - **Patch (`0.N.P`)** — fixes and small corrections landed between milestones,
   in a package that has already been released.
 
-The version comes from conventional-commit titles on `main` — a `feat:` bumps
-minor, a `fix:` bumps patch.
+Releases are cut by hand until release tooling is set up.
 
 ## Alpha
 

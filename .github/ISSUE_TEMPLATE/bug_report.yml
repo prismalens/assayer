@@ -38,7 +38,7 @@ body:
     id: version
     attributes:
       label: Assayer version
-      description: "`assayer --version` or package version"
+      description: "`npm ls -g @prismalens/assayer`, or the commit of your checkout"
       placeholder: 0.1.0
     validations:
       required: true
