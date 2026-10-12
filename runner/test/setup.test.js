@@ -33,3 +33,11 @@ describe('engine setup', () => {
     assert.match(logs.at(-1), /If you have not signed in yet: run `codex login`/);
   });
 });
+
+describe('npm install scripts', () => {
+  it('allows Claude Code its postinstall, and nothing else', async () => {
+    const { installArgs } = await import('../src/setup.js');
+    assert.deepEqual(installArgs(missingFor('claude-code', has())), ['i', '-g', '@anthropic-ai/claude-code', '@agentclientprotocol/claude-agent-acp@0.89.1', '--allow-scripts=@anthropic-ai/claude-code']);
+    assert.deepEqual(installArgs(missingFor('codex', has())), ['i', '-g', '@openai/codex', '@agentclientprotocol/codex-acp@2.1.1']);
+  });
+});

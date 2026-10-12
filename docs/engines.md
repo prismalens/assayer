@@ -6,7 +6,7 @@ title: Engines
 | Engine | Install | Sign-in |
 | --- | --- | --- |
 | Codex (default) | `npm i -g @openai/codex @agentclientprotocol/codex-acp@2.1.1` | `codex login`, or `OPENAI_API_KEY` |
-| Claude Code | `npm i -g @anthropic-ai/claude-code @agentclientprotocol/claude-agent-acp@0.89.1` | run `claude` and type `/login`, or `ANTHROPIC_API_KEY` |
+| Claude Code | `npm i -g @anthropic-ai/claude-code @agentclientprotocol/claude-agent-acp@0.89.1 --allow-scripts=@anthropic-ai/claude-code` | run `claude` and type `/login`, or `ANTHROPIC_API_KEY` |
 | OpenCode | `npm i -g opencode-ai@1.18.30` | none needed for its free models |
 
 Use whichever sign-in your plan offers. Each provider's own terms apply: [OpenAI](https://openai.com/policies/), [Anthropic](https://www.anthropic.com/legal), [OpenCode](https://opencode.ai).

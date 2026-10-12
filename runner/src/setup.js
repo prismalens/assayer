@@ -15,7 +15,14 @@ export function missingFor(engine, which = onPath) {
   return out;
 }
 
-export const installCommand = (missing) => `npm i -g ${missing.map((m) => m.pkg).join(' ')}`;
+// npm 11 skips install scripts unless allowed; Claude Code's postinstall puts its native binary in place.
+const NEEDS_SCRIPTS = ['@anthropic-ai/claude-code'];
+export function installArgs(missing) {
+  const pkgs = missing.map((m) => m.pkg);
+  const allow = pkgs.filter((p) => NEEDS_SCRIPTS.some((n) => p === n || p.startsWith(`${n}@`)));
+  return ['i', '-g', ...pkgs, ...allow.map((p) => `--allow-scripts=${p.replace(/(.)@[^/]*$/, '$1')}`)];
+}
+export const installCommand = (missing) => `npm ${installArgs(missing).join(' ')}`;
 
 export function setupHint(engine, missing) {
   const row = ENGINES[engine];
@@ -30,7 +37,7 @@ export async function offerSetup(engine, { which = onPath, confirm, run = defaul
   if (!missing.length) return true;
   log(setupHint(engine, missing));
   if (!(await confirm(`Run \`${installCommand(missing)}\` now?`))) return false;
-  if (run(['i', '-g', ...missing.map((m) => m.pkg)]) !== 0) { log('assayer: the install failed; the npm output above says why'); return false; }
+  if (run(installArgs(missing)) !== 0) { log('assayer: the install failed; the npm output above says why'); return false; }
   const still = missingFor(engine, which);
   if (still.length) { log(`assayer: still missing ${still.map((m) => m.what).join(' and ')} on PATH after the install`); return false; }
   if (ENGINES[engine].install.signIn) log(`assayer: ${LABELS[engine]} is installed. If you have not signed in yet: ${ENGINES[engine].install.signIn}.`);
