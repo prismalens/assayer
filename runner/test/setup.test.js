@@ -19,7 +19,7 @@ describe('engine setup', () => {
     assert.equal(await offerSetup('opencode', { ...quiet, confirm: async () => false }), false);
     assert.deepEqual(runs, []);
     assert.equal(await offerSetup('opencode', { ...quiet, confirm: async () => true }), false);
-    assert.deepEqual(runs, [['i', '-g', 'opencode-ai@1.18.30']]);
+    assert.deepEqual(runs, [['i', '-g', 'opencode-ai@1.18.30', '--allow-scripts=opencode-ai']]);
   });
 
   it('is ready once the install puts the commands on PATH', async () => {

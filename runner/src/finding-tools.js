@@ -11,6 +11,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod';
 import { looksLikeSecret } from './acp-map.js';
 import { anchorProblem, hunkRanges } from './diff-lines.js';
+import { formatProblem } from './finding-rules.js';
 
 const which = process.argv[2];
 const log = process.env.ASSAYER_TOOL_LOG;
@@ -52,8 +53,11 @@ if (which === 'github_inline_comment') {
   }, async (input) => {
     // Refused at filing time, as GitHub refuses it at posting time, so the engine re-files on a
     // diff line instead of leaving a stray copy. No diff to check against: recorded as before.
-    const problem = diff && anchorProblem(diff, input, process.env.ASSAYER_CHECKOUT || null);
-    if (problem) return { isError: true, content: [{ type: 'text', text: `Not recorded: ${problem}.` }] };
+    const problem = formatProblem(input.body) ?? (diff && anchorProblem(diff, input, process.env.ASSAYER_CHECKOUT || null));
+    if (problem) {
+      appendFileSync(`${log}.refused`, JSON.stringify({ at: new Date().toISOString(), path: input.path, line: input.line ?? null, problem }) + '\n');
+      return { isError: true, content: [{ type: 'text', text: `Not recorded: ${problem}.` }] };
+    }
     record('create_inline_comment', input);
     return { content: [{ type: 'text', text: JSON.stringify({ ok: true, recorded: true }) }] };
   });

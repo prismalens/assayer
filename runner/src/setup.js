@@ -15,8 +15,9 @@ export function missingFor(engine, which = onPath) {
   return out;
 }
 
-// npm 11 skips install scripts unless allowed; Claude Code's postinstall puts its native binary in place.
-const NEEDS_SCRIPTS = ['@anthropic-ai/claude-code'];
+// npm 11 skips install scripts unless allowed; Claude Code's and OpenCode's postinstalls put their
+// native binaries in place.
+const NEEDS_SCRIPTS = ['@anthropic-ai/claude-code', 'opencode-ai'];
 export function installArgs(missing) {
   const pkgs = missing.map((m) => m.pkg);
   const allow = pkgs.filter((p) => NEEDS_SCRIPTS.some((n) => p === n || p.startsWith(`${n}@`)));

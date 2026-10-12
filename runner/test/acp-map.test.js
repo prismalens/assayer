@@ -215,3 +215,14 @@ test('a Codex usage limit said as agent text, then a bare Internal error, is acc
   plain.onError(new Error('Internal error'));
   assert.equal(plain.events.find((e) => e.type === 'error').failure_class, 'api-error');
 });
+
+test('copies of one finding on neighbouring lines merge to the most severe; a finding two lines off stays', async () => {
+  const { withheldCount } = await import('../src/review.js');
+  const f = (line, sev, t) => ({ tool: 'create_inline_comment', input: { path: 'src/a.ts', line, body: `_🎯 Functional Correctness_ | _${sev}_ | _⚡ Quick win_\n\n**${t}**` } });
+  const m = mk();
+  const evs = m.finish({ toolLog: [f(209, '🟠 Major', 'one'), f(210, '🔴 Critical', 'two'), f(211, '🟠 Major', 'three'), f(213, '🟡 Minor', 'four'), f(238, '🟠 Major', 'five'), f(239, '🟠 Major', 'six')] });
+  const kept = evs.filter((e) => e.type === 'finding').map((e) => e.line);
+  assert.deepEqual(kept, [210, 213, 238]);
+  assert.equal(m.dropped.filter((d) => d.merged).length, 3);
+  assert.equal(withheldCount({ dropped: m.dropped }), 0, 'merged copies are not reported as withheld');
+});

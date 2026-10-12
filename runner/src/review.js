@@ -191,7 +191,7 @@ export function fileJournal(dir) {
 // Findings the runner lost before they became events. A corrupt tool-log line may have been
 // one, so it counts as withheld rather than letting the verdict say "no findings" (OBJ-005).
 export function withheldCount(summary) {
-  const dropped = (summary.dropped ?? []).filter((d) => d.tool === 'create_inline_comment' || /finding/i.test(d.why ?? '')).length;
+  const dropped = (summary.dropped ?? []).filter((d) => !d.merged && (d.tool === 'create_inline_comment' || /finding/i.test(d.why ?? ''))).length;
   return dropped + (summary.tool_log_corrupt_lines ?? 0);
 }
 
@@ -275,8 +275,10 @@ export function terminalMarkdown(md, tty) {
 }
 
 // An engine refused a command can give up filing; zero findings then is not a clean bill.
-export function refusalNote(s) {
-  const n = s.permissions?.rejected ?? 0;
+export function refusalNote(s, dir = null) {
+  let tool = 0;
+  try { tool = readFileSync(path.join(dir ?? '', 'tool-log.jsonl.refused'), 'utf8').split('\n').filter(Boolean).length; } catch { /* none refused */ }
+  const n = (s.permissions?.rejected ?? 0) + tool;
   if (!n || (s.findings ?? 0) > 0) return [];
   return [`  note: the engine was refused ${n} command${n === 1 ? '' : 's'} outside Assayer's allowlist and filed nothing; if the summary below describes problems, run the review again or with another engine`];
 }
@@ -328,7 +330,7 @@ function printRound(dir) {
   }
   const lines = [`${s.conclusion}: ${s.findings ?? 0} finding(s) in ${Math.round((s.wall_clock_ms ?? 0) / 1000)}s`];
   lines.push(...findingLines(findings, { tty: Boolean(process.stdout.isTTY) }));
-  lines.push(...refusalNote(s));
+  lines.push(...refusalNote(s, dir));
   const summary = events.findLast((e) => e.type === 'summary');
   if (summary) lines.push('', terminalMarkdown(withoutEngineCredit(summary.body), Boolean(process.stdout.isTTY)));
   process.stdout.write(lines.join('\n') + '\n');

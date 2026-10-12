@@ -159,6 +159,7 @@ export class SessionMapper {
         this.dropped.push({ why: `unknown tool ${e.tool}`, at: e.at });
       }
     }
+    this.#mergeDuplicates();
     if (summary !== null) {
       this.events.push(event('summary', { header: headerOf(summary) ?? firstLine(summary), body: summary }, { source: summarySource, writes: summaryCount }));
     } else if (this.agentText.length) {
@@ -166,6 +167,32 @@ export class SessionMapper {
       if (body && looksLikeSecret(body)) this.dropped.push({ why: 'agent text carries a credential-shaped token; no summary' });
       else if (body) this.events.push(event('summary', { header: null, body }, { source: 'agent_text' }));
     }
+  }
+
+  // One defect, one comment (the prompts' own rule): subagents that each file the same finding
+  // leave copies on neighbouring lines. Findings on one file within a line of each other, chained,
+  // keep the most severe, then the first filed; the rest are recorded as merged.
+  #mergeDuplicates() {
+    const rank = (b) => { const m = /_(🔴 Critical|🟠 Major|🟡 Minor)_/u.exec(b ?? ''); return m ? ['🔴 Critical', '🟠 Major', '🟡 Minor'].indexOf(m[1]) : 1; };
+    const found = this.events.map((e, i) => ({ e, i })).filter(({ e }) => e.type === 'finding' && Number.isInteger(e.line));
+    const byPath = new Map();
+    for (const f of found) byPath.set(`${f.e.path}|${f.e.side}`, [...(byPath.get(`${f.e.path}|${f.e.side}`) ?? []), f]);
+    const drop = new Set();
+    for (const group of byPath.values()) {
+      group.sort((a, b) => a.e.line - b.e.line || a.i - b.i);
+      let cluster = [];
+      const close = () => {
+        if (cluster.length < 2) return;
+        const keep = cluster.reduce((k, f) => (rank(f.e.body) < rank(k.e.body) || (rank(f.e.body) === rank(k.e.body) && f.i < k.i) ? f : k));
+        for (const f of cluster) if (f !== keep) { drop.add(f.i); this.dropped.push({ why: `duplicate of the finding at ${keep.e.path}:${keep.e.line}`, merged: true, line: f.e.line }); }
+      };
+      for (const f of group) {
+        if (cluster.length && f.e.line - cluster.at(-1).e.line > 1) { close(); cluster = []; }
+        cluster.push(f);
+      }
+      close();
+    }
+    if (drop.size) this.events = this.events.filter((_, i) => !drop.has(i));
   }
 
   // A subagent is a tool call whose input names a subagent type (OpenCode's `task`, kind
