@@ -24,7 +24,8 @@ npm i -g @openai/codex@0.162.1 @agentclientprotocol/codex-acp@2.1.1 && codex log
 gh auth login
 
 assayer doctor                             # what this machine has for a round
-assayer review owner/repo#123              # review and print
+assayer review                             # review your local changes before you push
+assayer review owner/repo#123              # review a pull request and print
 assayer review owner/repo#123 --post       # post the findings as you
 ```
 
@@ -46,6 +47,12 @@ Coverage: examined 8 of 8 reviewable files.
 ```
 
 With `--post`, each finding lands as an inline comment ending in a hidden `assayer-finding` marker, and a summary comment gives the coverage. `assayer publish <round dir>` posts or resumes a round that already ran.
+
+## Before you push
+
+`assayer review` with no pull request reviews what you have not pushed yet: unpushed commits plus staged, unstaged and untracked files. It compares against your branch's upstream, or `origin`'s default branch, or `main`; `--base <ref>` picks another. Your working tree, index and stash are never touched: the round reviews a snapshot in its own checkout. It only prints, and `--fail-on major` makes it exit 4 when it finds anything major or worse.
+
+`assayer hook install` adds an opt-in pre-push hook. It never starts a review, because a review takes minutes. It checks whether the commit you are pushing was reviewed and what was found, warns by default, and blocks only with `git config assayer.prepush block`. `git push --no-verify` always skips it.
 
 ## How it works
 
@@ -87,8 +94,8 @@ The first `assayer` run in a terminal prints a notice and sends nothing. Later r
 | Event | Properties |
 | --- | --- |
 | `install_active` | at most once a UTC day |
-| `round_finished` | engine, conclusion, findings bucket (`0`, `1`, `2-5`, `6-20`, `>20`), duration bucket, whether it was posted |
-| `refused` | engine, and which refusal: `closed`, `skip_label`, `already_reviewed`, `repo_config` |
+| `round_finished` | `pr` or `local`, engine, conclusion, findings bucket (`0`, `1`, `2-5`, `6-20`, `>20`), duration bucket, whether it was posted |
+| `refused` | `pr` or `local`, engine, and which refusal: `closed`, `skip_label`, `already_reviewed`, `repo_config`, `no_base`, `no_changes` |
 
 Every event also carries `product`, how it was installed (`npm` or `checkout`), OS, CPU architecture, Node major version, the Assayer version, and a random install id kept in `~/.assayer/telemetry.json`. Timestamps are cut to the UTC day, and IP geolocation is turned off. Assayer never sends repository names, paths, logins, code, prompts, findings or model output.
 
@@ -96,7 +103,7 @@ Every event also carries `product`, how it was installed (`npm` or `checkout`), 
 
 ## Known limits
 
-- It reviews pull requests. Reviewing local changes before you push is planned.
+- Local review runs on Codex for now; pull request review runs on all three engines.
 - A repository with `.github/claude-review.yml` is refused until the config resolver ships; `--ignore-repo-config` reviews it with the defaults.
 - GitHub has no conditional comment write or resolve, so a reply that lands in the moment between Assayer's last check and its resolve is not seen. It stays visible on the resolved thread.
 

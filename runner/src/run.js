@@ -93,7 +93,7 @@ export async function runRound(opts, { log = (s) => process.stderr.write(s + '\n
   if (opts.stage) {
     const t0 = Date.now();
     try {
-      const m = await buildManifest({ cwd, repo: opts.repo, pr: opts.pr, mode: opts.mode, headSha: opts.headSha, ghToken: opts.ghToken ?? process.env.GH_TOKEN ?? process.env.GITHUB_TOKEN });
+      const m = await buildManifest({ cwd, repo: opts.repo, pr: opts.pr, mode: opts.mode, headSha: opts.headSha, ghToken: opts.ghToken ?? process.env.GH_TOKEN ?? process.env.GITHUB_TOKEN, localFiles: opts.localFiles, baseSha: opts.baseSha });
       staged = { files: m.manifest?.files?.length ?? null, reviewable: (m.manifest?.files ?? []).filter((f) => !f.filtered_by).length, diff_bytes: m.diffBytes, ms: Date.now() - t0, refused: m.refused };
       writeFileSync(path.join(out, 'manifest-stderr.log'), m.stderr ?? '');
     } catch (e) {
@@ -120,14 +120,15 @@ export async function runRound(opts, { log = (s) => process.stderr.write(s + '\n
   const baseEnv = engineEnv(row, source, opts.credentialEnv ? [opts.credentialEnv] : []);
   // The engine's `gh` is the shim: `pr comment` is recorded, never posted. Story: #184 day one.
   const realGh = whichGh(baseEnv.PATH ?? process.env.PATH ?? '');
-  if (!realGh) throw new Error('gh is not on PATH; the lane\'s prompt needs it for read commands');
+  // Offline, gh reads fail closed anyway, so a machine without gh still gets the summary shim.
+  if (!realGh && opts.engineGh !== 'offline') throw new Error('gh is not on PATH; the lane\'s prompt needs it for read commands');
   const binDir = path.join(out, 'bin');
   mkdirSync(binDir, { recursive: true });
   copyFileSync(path.join(HERE, 'gh-shim.sh'), path.join(binDir, 'gh'));
   chmodSync(path.join(binDir, 'gh'), 0o755);
   const env = row.prepare({ model: opts.model, outDir: out, env: {
     ...baseEnv, PATH: `${binDir}${path.delimiter}${baseEnv.PATH ?? process.env.PATH ?? ''}`,
-    ASSAYER_TOOL_LOG: toolLog, ASSAYER_REAL_GH: realGh,
+    ASSAYER_TOOL_LOG: toolLog, ASSAYER_REAL_GH: realGh ?? 'false',
     // The shim is a copy in <out>/bin; secret-check.js stays here beside its imports.
     ASSAYER_SECRET_CHECK: path.join(HERE, 'secret-check.js'),
     // A local round runs on the operator's own login, which is a broad write token. The

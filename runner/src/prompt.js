@@ -202,8 +202,13 @@ export function laneTokens({ repo, pr, level = 'medium', mode = 'review', rangeB
 
 // The Codex template (prompt/codex.md) takes the round's two commits so the engine reads the
 // diff per file with `git diff`; it has no workflow twin and no level or mode tokens.
-export function renderCodexPrompt(template, { repo, pr, baseSha, headSha }) {
-  const tokens = { REPO: repo, PR_NUMBER: String(pr), BASE_SHA: baseSha, HEAD_SHA: headSha };
+export function renderCodexPrompt(template, { repo, pr, baseSha, headSha, local = null }) {
+  const tokens = {
+    SUBJECT: local ? `the local changes in ${local.label} that are not yet pushed` : `pull request ${repo}#${pr}`,
+    HEAD_LABEL: local ? (local.dirty ? 'a snapshot of the working tree' : 'the local head') : 'the PR head',
+    CITE_PREFIX: local ? '' : `https://github.com/${repo}/blob/${headSha}/`,
+    REPO: repo, PR_NUMBER: String(pr), BASE_SHA: baseSha, HEAD_SHA: headSha,
+  };
   let text = template;
   for (const [k, v] of Object.entries(tokens)) text = replaceAll(text, k, v);
   const left = text.match(/@@[A-Z0-9_]+@@/g);

@@ -1,5 +1,5 @@
 <task>
-Review pull request @@REPO@@#@@PR_NUMBER@@ and report every defect its author would want to fix before merging. The checkout is at the PR head, @@HEAD_SHA@@. The base is @@BASE_SHA@@. Both commits are already in the local repository.
+Review @@SUBJECT@@ and report every defect its author would want to fix before merging. The checkout is at @@HEAD_LABEL@@, @@HEAD_SHA@@. The base is @@BASE_SHA@@. Both commits are already in the local repository.
 </task>
 
 <done_when>
@@ -42,7 +42,7 @@ Post each finding with the `create_inline_comment` tool, `confirmed: true`, anch
    Severity: `🔴 Critical` (build failure, crash, security compromise, data loss), `🟠 Major` (definite bug, contract break, unambiguous rule violation), `🟡 Minor` (non-fatal invariant gap that cites the invariant).
    Effort: `⚡ Quick win` (one file, at most 15 lines, unambiguous), `🏗️ Heavy lift` (anything larger or needing design judgment).
 2. `<details><summary>🔍 Verification note</summary>` containing `> **Validation:** ` and one to three sentences, under 60 words, on what you inspected and what it proved, then `</details>`.
-3. A bold title, then one paragraph on the defect and the inputs or conditions that trigger it. Cite rules and code as `https://github.com/@@REPO@@/blob/@@HEAD_SHA@@/<path>#L<a>-L<b>`. A ```suggestion block only when committing it fixes the defect entirely.
+3. A bold title, then one paragraph on the defect and the inputs or conditions that trigger it. Cite rules and code as `@@CITE_PREFIX@@<path>#L<a>-L<b>`. A ```suggestion block only when committing it fixes the defect entirely.
 4. `<details><summary>🤖 Prompt for AI Agents</summary>` with a fenced block: "This is one candidate resolution. Verify the finding against current code, and choose a different fix if the file's evidence points elsewhere." followed by `In \`<path>\` around lines <a>-<b>: <fix>.`, then `</details>`.
 
 Then post one summary with `gh pr comment @@PR_NUMBER@@ --repo @@REPO@@ --body '<text>'`. Its first line is exactly `## Code review`. Lead with the findings by severity, then the coverage count. With no findings, write "No issues found." and the coverage count.

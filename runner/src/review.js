@@ -15,11 +15,18 @@ import { renderPrompt, renderCodexPrompt, promptHash, laneTokens } from './promp
 import { checkout } from './github.js';
 import { runRound } from './run.js';
 import { LIVENESS_PREFIX, postRound } from './poster.js';
+import { changedFiles, chooseBase, localCheckout, refusal as localRefusal, repoTop, sameTree, severityOf, snapshot, git as localGit } from './local.js';
+
+export { severityOf };
+import { hookCommand } from './hook.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const USAGE = `usage:
   assayer review <owner/repo#N | PR URL> [--engine codex] [--model M] [--post] [--again]
                  [--ignore-repo-config] [--out DIR]
+  assayer review [--base REF] [--head REV] [--fail-on critical|major|minor] [--model M]
+                 [--ignore-repo-config] [--out DIR]      reviews local changes, prints only
+  assayer hook install|uninstall
   assayer publish <round dir>
   assayer telemetry on|off|status
   assayer doctor
@@ -43,6 +50,11 @@ export function parseArgs(argv) {
     if (!target || rest.length) throw new Error(USAGE);
     return { cmd, dir: target };
   }
+  if (cmd === 'hook') {
+    if (!['install', 'uninstall', 'pre-push'].includes(target)) throw new Error(USAGE);
+    return { cmd, action: target, args: rest };
+  }
+  if (cmd === 'review' && (target === undefined || target.startsWith('--'))) return parseLocal(target === undefined ? [] : [target, ...rest]);
   if (cmd !== 'review' || !target) throw new Error(USAGE);
   const o = { cmd, ...parseTarget(target), engine: 'codex', model: null, post: false, again: false, ignoreRepoConfig: false, out: null };
   for (let i = 0; i < rest.length; i += 1) {
@@ -57,6 +69,28 @@ export function parseArgs(argv) {
     else throw new Error(`unknown argument ${a}\n${USAGE}`);
   }
   if (!(o.engine in ENGINES)) throw new Error(`unknown engine ${o.engine}; known: ${Object.keys(ENGINES).join(', ')}`);
+  return o;
+}
+
+export const SEVERITIES = ['critical', 'major', 'minor'];
+
+function parseLocal(rest) {
+  const o = { cmd: 'review', local: true, engine: 'codex', model: null, base: null, head: null, failOn: null, ignoreRepoConfig: false, out: null };
+  for (let i = 0; i < rest.length; i += 1) {
+    const a = rest[i];
+    const need = () => { const v = rest[i + 1]; if (v === undefined) throw new Error(`${a} needs a value`); i += 1; return v; };
+    if (a === '--base') o.base = need();
+    else if (a === '--head') o.head = need();
+    else if (a === '--engine') o.engine = need();
+    else if (a === '--model') o.model = need();
+    else if (a === '--fail-on') o.failOn = need();
+    else if (a === '--ignore-repo-config') o.ignoreRepoConfig = true;
+    else if (a === '--out') o.out = need();
+    else if (a === '--post' || a === '--again') throw new Error(`${a} needs a pull request; a local review prints only\n${USAGE}`);
+    else throw new Error(`unknown argument ${a}\n${USAGE}`);
+  }
+  if (o.engine !== 'codex') throw new Error('local review needs --engine codex for now');
+  if (o.failOn !== null && !SEVERITIES.includes(o.failOn)) throw new Error(`--fail-on takes ${SEVERITIES.join(', ')}`);
   return o;
 }
 
@@ -144,6 +178,7 @@ export function withheldCount(summary) {
 
 export async function publish(dir, { log = (s) => process.stderr.write(s + '\n'), fetch = globalThis.fetch, token = null, login = null } = {}) {
   const round = JSON.parse(readFileSync(path.join(dir, 'round.json'), 'utf8'));
+  if (round.mode === 'local') throw new Error('a local round has nothing to post to; push and review the pull request');
   const events = readFileSync(path.join(dir, 'events.jsonl'), 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l));
   const finished = events.findLast((e) => e.type === 'finished');
   // A round that did not complete has nothing to stand on; posting its liveness would
@@ -171,14 +206,26 @@ export async function publish(dir, { log = (s) => process.stderr.write(s + '\n')
   return r;
 }
 
+export function atOrAbove(findings, failOn) {
+  if (!failOn) return 0;
+  const rank = (x) => SEVERITIES.indexOf(x);
+  return findings.filter((f) => rank(severityOf(f.body)) <= rank(failOn)).length;
+}
+
+export function readFindings(dir) {
+  const events = readFileSync(path.join(dir, 'events.jsonl'), 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l));
+  return { events, findings: events.filter((e) => e.type === 'finding') };
+}
+
 function printRound(dir) {
   const s = JSON.parse(readFileSync(path.join(dir, 'summary.json'), 'utf8'));
-  const events = readFileSync(path.join(dir, 'events.jsonl'), 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l));
+  const { events, findings } = readFindings(dir);
   const lines = [`${s.conclusion}: ${s.findings ?? 0} finding(s) in ${Math.round((s.wall_clock_ms ?? 0) / 1000)}s`];
-  for (const f of events.filter((e) => e.type === 'finding')) {
+  for (const f of findings) {
     const after = f.body.slice(f.body.indexOf('</details>') + 1);
     const title = (/\*\*(.+?)\*\*/.exec(after)?.[1] ?? f.body.split('\n')[0]).slice(0, 140);
-    lines.push(`  ${f.path}:${f.line ?? '?'}  ${title}`);
+    const sev = severityOf(f.body);
+    lines.push(`  [${sev[0].toUpperCase()}${sev.slice(1)}] ${f.path}:${f.line ?? '?'}  ${title}`);
   }
   const summary = events.findLast((e) => e.type === 'summary');
   if (summary) lines.push('', summary.body);
@@ -187,6 +234,46 @@ function printRound(dir) {
 
 // A refusal before any quota is spent; telemetry sends its kind, never the message.
 const refusal = (reason, message) => Object.assign(new Error(message), { refusal: reason });
+
+// The round's checkout is a shared clone of this repository at the snapshot, so the engine
+// sees exactly the uncommitted and untracked work and the user's own files are never opened.
+export async function reviewLocal(o, { log = (s) => process.stderr.write(s + '\n'), cwd = process.cwd() } = {}) {
+  const top = repoTop(cwd);
+  const label = path.basename(top).replace(/[^\w.-]/g, '-') || 'repo';
+  const stamp = Date.now();
+  const dir = path.resolve(o.out ?? path.join(os.homedir(), '.assayer', 'reviews', `local-${label}-${stamp}`));
+  if (existsSync(path.join(dir, 'round.json'))) throw new Error(`${dir} already holds a round; pick a new --out`);
+  mkdirSync(dir, { recursive: true });
+  const snap = o.head
+    ? { head: localGit(top, ['rev-parse', '--verify', `${o.head}^{commit}`]), dirty: false }
+    : snapshot(top, path.join(dir, 'snapshot.index'));
+  snap.tree = localGit(top, ['rev-parse', `${snap.head}^{tree}`]);
+  const base = chooseBase(top, { base: o.base });
+  if (sameTree(top, base.sha, snap.head)) throw localRefusal('no_changes', `nothing to review: ${snap.dirty ? 'the working tree' : snap.head.slice(0, 7)} matches ${base.sha.slice(0, 7)} from ${base.source}`);
+  if (!o.ignoreRepoConfig && localGit(top, ['cat-file', '-e', `${snap.head}:.github/claude-review.yml`], { allowFail: true }) !== null) {
+    throw localRefusal('repo_config', 'this repository has .github/claude-review.yml, which a local round cannot apply yet (#182); pass --ignore-repo-config to review with the defaults');
+  }
+  const checkoutDir = path.join(dir, 'checkout');
+  localCheckout(top, snap.head, checkoutDir);
+  const repo = `local/${label}`;
+  const prompt = { text: renderCodexPrompt(readFileSync(path.join(HERE, '..', 'prompt', 'codex.md'), 'utf8'), { repo, pr: 0, baseSha: base.sha, headSha: snap.head, local: { label, dirty: snap.dirty } }) };
+  prompt.hash = promptHash(prompt.text);
+  writeFileSync(path.join(dir, 'prompt.md'), prompt.text);
+  const round = { mode: 'local', repository: null, pr_number: null, local_path: top, head_sha: snap.head, head_tree: snap.tree, base_sha: base.sha, base_source: base.source, dirty: snap.dirty, engine: o.engine, model: o.model, where: 'local' };
+  writeFileSync(path.join(dir, 'round.json'), JSON.stringify(round, null, 2) + '\n');
+  log(`assayer: local changes in ${label}, ${snap.dirty ? 'working tree' : snap.head.slice(0, 7)} vs ${base.sha.slice(0, 7)} from ${base.source}, with ${o.engine}; round in ${dir}`);
+  const summary = await runRound({
+    cwd: checkoutDir, prompt: path.join(dir, 'prompt.md'), out: dir, engine: o.engine, model: o.model, promptHash: prompt.hash,
+    stage: true, repo, pr: '0', headSha: snap.head, baseSha: base.sha, mode: 'review', ghToken: '', engineGh: 'offline',
+    localFiles: changedFiles(checkoutDir, base.sha, snap.head),
+    timeoutMs: (ENGINES[o.engine].timeoutMin ?? 20) * 60 * 1000, idleMs: (ENGINES[o.engine].idleMin ?? 8) * 60 * 1000,
+  }, { log });
+  printRound(dir);
+  const { findings } = readFindings(dir);
+  const counts = Object.fromEntries(SEVERITIES.map((x) => [x, findings.filter((f) => severityOf(f.body) === x).length]));
+  log(`assayer: ${findings.length} finding(s) (${counts.critical} critical, ${counts.major} major, ${counts.minor} minor), ${snap.dirty ? `working tree on ${localGit(top, ['rev-parse', '--short', 'HEAD'])}` : snap.head.slice(0, 7)} vs ${base.sha.slice(0, 7)} from ${base.source}; round in ${dir}`);
+  return { dir, summary, posted: null, blocking: atOrAbove(findings, o.failOn) };
+}
 
 export async function review(o, { log = (s) => process.stderr.write(s + '\n') } = {}) {
   const pr = ghJson(`repos/${o.repo}/pulls/${o.pr}`);
@@ -242,18 +329,21 @@ if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.me
     process.stdout.write(tel.status() + '\n');
     process.exit(0);
   }
+  if (o.cmd === 'hook') process.exit(hookCommand(o));
   tel.start();
   tel.active();
   const t0 = Date.now();
+  const mode = o.local ? 'local' : 'pr';
   const run = o.cmd === 'publish'
     ? publish(path.resolve(o.dir)).then(() => 0)
-    : review(o).then((r) => {
-      tel.capture('round_finished', { engine: o.engine, conclusion: r.summary.conclusion, findings: countBucket(r.summary.findings), duration_bucket: durationBucket(Date.now() - t0), posted: r.posted !== null });
-      return r.summary.conclusion === 'completed' ? 0 : 3;
+    : (o.local ? reviewLocal(o) : review(o)).then((r) => {
+      tel.capture('round_finished', { mode, engine: o.engine, conclusion: r.summary.conclusion, findings: countBucket(r.summary.findings), duration_bucket: durationBucket(Date.now() - t0), posted: r.posted !== null });
+      if (r.summary.conclusion !== 'completed') return 3;
+      return r.blocking ? 4 : 0;
     });
   run.catch((e) => {
-    if (e.refusal) tel.capture('refused', { engine: o.engine, reason: e.refusal });
+    if (e.refusal) tel.capture('refused', { mode, engine: o.engine, reason: e.refusal });
     process.stderr.write(`assayer: ${e.message}\n`);
-    return 1;
+    return e.refusal === 'no_changes' ? 0 : 1;
   }).then(async (code) => { await tel.flush(); process.exit(code); });
 }

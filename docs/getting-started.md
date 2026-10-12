@@ -44,6 +44,19 @@ assayer publish ~/.assayer/reviews/<round dir>
 assayer review owner/repo#123 --post
 ```
 
+## Review before you push
+
+```bash
+assayer review                    # unpushed commits plus uncommitted and untracked changes
+assayer review --base main        # compare with another base
+assayer review --fail-on major    # exit 4 when anything major or worse is found
+assayer hook install              # opt-in pre-push hook: warns about unreviewed or failing pushes
+```
+
+The round reviews a snapshot of your working tree in its own checkout, so your files, index and stash are never touched. It prints only; there is nothing to post to. Local review runs on Codex for now.
+
+The hook never starts a review. It looks for a finished local round covering what you push, warns when there is none or when it found something major, and blocks only with `git config assayer.prepush block` (or `ASSAYER_PREPUSH=block`). `git push --no-verify` skips it.
+
 ## Flags
 
 | Flag | Effect |

@@ -26,6 +26,8 @@ assayer review prismalens/sreforge#183            # print only
 assayer review prismalens/sreforge#183 --post     # post as you
 ```
 
+`assayer review` with no target reviews local changes not yet pushed, against `--base` or the upstream, `origin`'s default branch, `main` or `master`. It snapshots the working tree through a temporary index into its own checkout, prints only, and exits 4 with `--fail-on critical|major|minor` when it finds that or worse. `assayer hook install|uninstall` manages an opt-in pre-push hook that reads finished local rounds and never starts one; `assayer.prepush` (`off`, `warn`, `block`) sets what it does.
+
 `assayer doctor` lists what a round needs on this machine and exits non-zero when something required is missing; `assayer --version` prints the package version. `assayer telemetry on|off|status` controls the usage counts described in the top-level README's Telemetry section.
 
 It refuses, before spending any quota, a PR that is closed, carries `claude_review_skip`, already

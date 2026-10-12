@@ -8,8 +8,8 @@ The first `assayer` run in a terminal prints a notice and sends nothing. Later r
 | Event | Properties |
 | --- | --- |
 | `install_active` | at most once a UTC day |
-| `round_finished` | engine, conclusion, findings bucket (`0`, `1`, `2-5`, `6-20`, `>20`), duration bucket, whether it was posted |
-| `refused` | engine, and which refusal: `closed`, `skip_label`, `already_reviewed`, `repo_config` |
+| `round_finished` | `pr` or `local`, engine, conclusion, findings bucket (`0`, `1`, `2-5`, `6-20`, `>20`), duration bucket, whether it was posted |
+| `refused` | `pr` or `local`, engine, and which refusal: `closed`, `skip_label`, `already_reviewed`, `repo_config`, `no_base`, `no_changes` |
 
 Every event also carries `product`, how it was installed (`npm` or `checkout`), OS, CPU architecture, Node major version, the Assayer version, and a random install id kept in `~/.assayer/telemetry.json`. Timestamps are cut to the UTC day, and IP geolocation is turned off.
 

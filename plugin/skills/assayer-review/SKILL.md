@@ -18,6 +18,7 @@ metadata:
 ## 2. Run a round
 
 ```bash
+assayer review                           # review local changes before pushing; prints only
 assayer review owner/repo#123            # review and print; posts nothing
 assayer review owner/repo#123 --post     # review and post the findings as the user
 assayer publish <round dir>              # post, or resume posting, a round that already ran
