@@ -42,9 +42,10 @@ export function doctor({ probe = defaultProbe, which = onPath, nodeVersion = pro
     const adapter = row.command === row.cli ? cli?.ok : Boolean(which(row.command));
     const version = cli?.ok ? firstVersion(cli.out) : null;
     const ready = Boolean(cli?.ok && adapter);
-    const missing = [!cli?.ok && row.cli, !adapter && row.command].filter(Boolean);
+    const missing = [...new Set([!cli?.ok && row.cli, !adapter && row.command].filter(Boolean))];
     const note = ready && row.admitted?.version && version && version !== row.admitted.version ? `; tested on ${row.admitted.version}` : '';
-    add(`engine ${id}`, ready, ready ? `${row.cli} ${version ?? ''}${note}`.trim() : `missing ${missing.join(' and ')}`, false);
+    const fix = [...new Set([!cli?.ok && row.install?.cli, !adapter && row.install?.adapter].filter(Boolean))];
+    add(`engine ${id}`, ready, ready ? `${row.cli} ${version ?? ''}${note}`.trim() : `missing ${missing.join(' and ')}${fix.length ? `: npm i -g ${fix.join(' ')}` : ''}`, false);
     return ready;
   });
 

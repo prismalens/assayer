@@ -10,6 +10,7 @@ export const ENGINES = Object.freeze({
   opencode: {
     command: 'opencode',
     cli: 'opencode',
+    install: { cli: 'opencode-ai@1.18.30', signIn: null },
     // --pure: no user plugins or global config; --cwd pins the project. Mirrors the prismalens
     // registry row that passed the #561 admission run.
     args: ({ cwd }) => ['acp', '--pure', '--cwd', cwd],
@@ -49,6 +50,7 @@ export const ENGINES = Object.freeze({
     // ChatGPT login, and its only refusal aborts the turn.
     command: 'codex-acp',
     cli: 'codex',
+    install: { cli: '@openai/codex', adapter: '@agentclientprotocol/codex-acp@2.1.1', signIn: 'run `codex login`' },
     args: () => [],
     envAllow: [...BASE_ENV, 'GH_TOKEN', 'GITHUB_TOKEN', 'CODEX_HOME', 'OPENAI_API_KEY', 'CODEX_API_KEY'],
     credentialKinds: ['api-key', 'user-login'],
@@ -71,6 +73,7 @@ export const ENGINES = Object.freeze({
   'claude-code': {
     command: 'claude-agent-acp',
     cli: 'claude',
+    install: { cli: '@anthropic-ai/claude-code', adapter: '@agentclientprotocol/claude-agent-acp@0.89.1', signIn: 'run `claude` and type `/login`' },
     args: () => [],
     envAllow: [...BASE_ENV, 'GH_TOKEN', 'GITHUB_TOKEN', 'ANTHROPIC_API_KEY', 'ANTHROPIC_BASE_URL', 'ANTHROPIC_AUTH_TOKEN',
       'ANTHROPIC_MODEL', 'CLAUDE_CONFIG_DIR', 'CLAUDE_CODE_EXECUTABLE', 'CLAUDE_CODE_DISABLE_BACKGROUND_TASKS',
@@ -80,7 +83,7 @@ export const ENGINES = Object.freeze({
     // No user settings, hooks, plugins or CLAUDE.md, and no reads outside the checkout. The adapter
     // starts in the user's own defaultMode ("auto" ran shell unasked), so the round sets Always ask
     // and every gated call reaches the policy (planner ruling, run-plan 2026-10-13).
-    sessionMeta: { claudeCode: { options: { settingSources: [], settings: { permissions: { blockReadsOutsideWorkingDirectories: true } } } } },
+    sessionMeta: { claudeCode: { options: { settingSources: [], strictMcpConfig: true, settings: { permissions: { blockReadsOutsideWorkingDirectories: true } } } } },
     sessionMode: 'default',
     prepare({ model, env }) {
       return { ...env, CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: '1', ...(model ? { ANTHROPIC_MODEL: model } : {}) };

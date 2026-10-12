@@ -7,6 +7,7 @@ describe('engine rows', () => {
     const row = ENGINES['claude-code'];
     assert.equal(row.sessionMode, 'default');
     assert.deepEqual(row.sessionMeta.claudeCode.options.settingSources, []);
+    assert.equal(row.sessionMeta.claudeCode.options.strictMcpConfig, true, 'no claude.ai connectors in a round');
     assert.equal(row.sessionMeta.claudeCode.options.settings.permissions.blockReadsOutsideWorkingDirectories, true);
   });
 

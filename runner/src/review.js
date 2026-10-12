@@ -20,7 +20,8 @@ import { changedFiles, chooseBase, localCheckout, refusal as localRefusal, repoT
 export { severityOf };
 import { hookCommand } from './hook.js';
 import { startProgress } from './progress.js';
-import { KEYS, formatSettings, readSettings, resolveDefaults, settingsFile, writeSetting } from './settings.js';
+import { LABELS, missingFor, offerSetup, setupHint } from './setup.js';
+import { KEYS, formatSettings, readSettings, resolveDefaults, writeSetting } from './settings.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const USAGE = `usage:
@@ -253,22 +254,31 @@ function printRound(dir) {
   process.stdout.write(lines.join('\n') + '\n');
 }
 
-// The one-time question: only engines doctor finds installed are offered.
+// The one-time question. Every engine is offered; one that is not installed says so, and
+// choosing it leads to the setup offer below.
 async function pickEngine() {
   const { select, isCancel } = await import('@clack/prompts');
-  const order = Object.keys(LABELS);
-  const ready = doctor().checks.filter((c) => c.name.startsWith('engine ') && c.ok)
-    .sort((x, y) => order.indexOf(x.name.slice(7)) - order.indexOf(y.name.slice(7)));
-  if (!ready.length) throw new Error(`no engine is installed; \`assayer doctor\` says what is missing (${settingsFile()} unchanged)`);
+  const checks = Object.fromEntries(doctor().checks.map((c) => [c.name, c]));
   const choice = await select({
     message: 'Which engine should review? This becomes your default.',
-    options: ready.map((c) => ({ value: c.name.slice('engine '.length), label: LABELS[c.name.slice('engine '.length)], hint: c.detail })),
+    options: Object.keys(LABELS).map((id) => {
+      const c = checks[`engine ${id}`];
+      return { value: id, label: LABELS[id], hint: c.ok ? c.detail : 'not installed yet; Assayer can set it up' };
+    }),
   });
   if (isCancel(choice)) throw Object.assign(new Error('no engine chosen; nothing saved'), { cancelled: true });
   return choice;
 }
 
-const LABELS = { codex: 'Codex', 'claude-code': 'Claude Code', opencode: 'OpenCode' };
+// An engine that is not installed is set up here, or refused before anything is spent.
+async function ensureEngine(engine, interactive) {
+  const missing = missingFor(engine);
+  if (!missing.length) return;
+  if (!interactive) throw new Error(setupHint(engine, missing));
+  const { confirm, isCancel } = await import('@clack/prompts');
+  const ok = await offerSetup(engine, { confirm: async (message) => { const a = await confirm({ message }); return !isCancel(a) && a; } });
+  if (!ok) throw new Error(`${LABELS[engine]} is not set up; \`assayer doctor\` lists what is missing`);
+}
 
 // The live view stops before the round's own closing line, so the two never share a row.
 async function watched(dir, engine, log, run) {
@@ -387,6 +397,7 @@ if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.me
         settings: readSettings(), isTTY: Boolean(process.stdin.isTTY && process.stdout.isTTY), pick: pickEngine,
         save: (k, v) => writeSetting(k, v), log: (s) => process.stderr.write(s + '\n'),
       });
+      await ensureEngine(o.engine, Boolean(process.stdin.isTTY && process.stdout.isTTY));
     } catch (e) { process.stderr.write(`assayer: ${e.message}\n`); process.exit(e.cancelled ? 130 : 2); }
   }
   tel.start();

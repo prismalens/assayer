@@ -95,3 +95,10 @@ test('keeps read-anywhere and code-running forms of git, rg, sed and cat refused
   }
   assert.equal(decide({ kind: 'execute', rawInput: { command: 'git show HEAD' } }).allow, false);
 });
+
+test('a double-quoted body may escape a backtick or a dollar, and nothing else expands', () => {
+  assert.equal(commandAllowed('gh pr comment 13 --repo o/r --body "## Code review\nThe \\`getTodos\\` key costs \\$5."'), true);
+  for (const c of ['gh pr comment 13 --body "a \\`id\\` `id`"', 'gh pr comment 13 --body "\\$(id) $(id)"', 'gh pr comment 13 --body "a\\\\"; id"', 'gh pr comment 13 --body "a\\nb\\`"']) {
+    assert.equal(commandAllowed(c), false, c);
+  }
+});
