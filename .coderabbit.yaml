@@ -1,0 +1,54 @@
+# Auto review is off; the hourly CodeRabbit summoner routine summons each PR (gh-workflows#216).
+language: en-US
+reviews:
+  profile: chill
+  auto_review:
+    enabled: false
+    auto_pause_after_reviewed_commits: 1
+    ignore_title_keywords:
+      - "WIP"
+    ignore_usernames:
+      - "dependabot[bot]"
+  path_instructions:
+    - path: "worker/**"
+      instructions: >-
+        `tests/test-schema-drift.py` in prismalens/gh-workflows requires every column to be read or explicitly
+        allowlisted, so a column added and never read fails the build on purpose; do not
+        suggest silencing it. Blob columns are returned only under `include=blobs`, because
+        returning one unconditionally changes the size of every list response. Migrations are
+        forward-only and `deploy-worker.yml` has no `workflow_dispatch`, so the schema ships on
+        merge and cannot be applied by hand first: flag a migration whose correctness depends
+        on a backfill, since old rows never gain a value. Ingest authenticates with one shared
+        bearer token whose Cloudflare copy is write-only and cannot be read back, so a partial
+        repair is impossible and every change to it is a full rotation across five locations.
+        Round payloads are lane-authored, but anything the findings sweep stores was written by
+        people on a pull request: flag any place that treats swept thread text, comment bodies
+        or logins as trusted.
+    - path: "dashboard/**"
+      instructions: >-
+        The one rule this surface exists to hold: a number or label on screen must be backed by
+        a column that exists. A field a round does not carry is named as not recorded, naming
+        the field, never "unavailable", never inferred from posted text, never defaulted to
+        zero or to an empty state that reads as a clean result. Flag any fallback that makes an
+        unknown look like a known. Aggregates are withheld below the sparse-range thresholds in
+        `honesty/thresholds.ts` while counts stay true at any n. The `self-graded` fate must
+        never render in the green used for `resolved-by-human`, because green would present the
+        lane agreeing with itself as an independent result. Refused outright, so flag them if
+        they reappear: a savings tile, a quality score, a resolution rate, findings-per-review,
+        and any self-confirmation rate.
+    - path: "runner/**"
+      instructions: >-
+        The engine must never receive a GitHub credential: the CLI strips GH_TOKEN and
+        GITHUB_TOKEN from its environment and shims `gh`. Flag any path that hands a token,
+        a token file or the user's gh config to the engine process. A local round posts only
+        through `--post` or `assayer publish`, under the user's own login; flag any other
+        write to GitHub. A finding is Assayer's only when its body ends in the
+        `assayer-finding` marker, and trust is a Bot or write/admin permission, never
+        `author_association`. GitHub has no conditional comment write or resolve, so every
+        check before a write narrows a window rather than closing it; flag code that claims
+        otherwise.
+    - path: "plugin/**"
+      instructions: >-
+        The skill describes the CLI in runner/src/review.js. Flag any flag, refusal or
+        verdict the skill names that the code does not implement, and any instruction that
+        lets an agent post findings or resolve a thread without the user asking.

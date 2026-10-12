@@ -1,0 +1,20 @@
+name: PR Title
+
+# pull_request_target runs the base copy of this workflow, so a PR cannot edit the check
+# that judges its own title. Nothing here checks out PR code.
+on:
+  pull_request_target:
+    branches: [main]
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  lint:
+    name: PR title
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate PR title
+        uses: prismalens/gh-workflows/actions/pr-title@906b9b4ee92b098cf2fa2e15971da44f069cf7cc
