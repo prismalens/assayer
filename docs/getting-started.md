@@ -7,26 +7,18 @@ title: Getting started
 
 - Node 24 or newer, `git` and `python3`.
 - The GitHub CLI, signed in: `gh auth login`.
-- One engine, installed and signed in. See [Engines](engines.md).
+- An engine: Codex, Claude Code or OpenCode. Assayer can install the one you pick; you sign in to it yourself. See [Engines](engines.md).
 
 ## Install
 
-Until the first npm release, install from a checkout:
-
 ```bash
-git clone https://github.com/prismalens/assayer && cd assayer
-cd runner && npm ci && npm link
-```
-
-After the first release this becomes `npm i -g @prismalens/assayer`.
-
-Then check the machine:
-
-```bash
+npm i -g @prismalens/assayer
 assayer doctor
 ```
 
-It lists Node, git, python3, gh and its sign-in, and each engine as ready or missing, and exits non-zero when a round cannot run.
+`assayer doctor` lists Node, git, python3, gh and its sign-in, and each engine as ready or missing with the command that installs it, and exits non-zero when a round cannot run.
+
+From a checkout instead: `git clone https://github.com/prismalens/assayer && cd assayer/runner && npm ci && npm link`.
 
 ## Your first round
 
@@ -34,7 +26,9 @@ It lists Node, git, python3, gh and its sign-in, and each engine as ready or mis
 assayer review owner/repo#123
 ```
 
-The round checks out the pull request's head in a fresh directory, runs the engine over it, and prints the findings. Nothing is posted. The round is kept under `~/.assayer/reviews/`.
+The first time, Assayer asks which engine to use and saves the answer as your default. If the engine is not installed, it shows the install command and offers to run it, then reminds you to sign in to the engine once.
+
+The round checks out the pull request's head in a fresh directory, runs the engine over it, and prints the findings. Nothing is posted. While it runs, a terminal shows the elapsed time, the engine's tool calls and each finding as the engine files it. The round is kept under `~/.assayer/reviews/`.
 
 When the findings look right, post them as you:
 

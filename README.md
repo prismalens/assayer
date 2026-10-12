@@ -15,35 +15,35 @@ Assayer is open source code review that runs on your machine with your own Codex
 
 ## Quick start
 
-You need Node 24 or newer, `git`, `python3`, the GitHub CLI and one engine.
+You need Node 24 or newer, `git`, `python3` and the [GitHub CLI](https://cli.github.com) signed in (`gh auth login`).
 
 ```bash
-git clone https://github.com/prismalens/assayer && cd assayer
-cd runner && npm ci && npm link            # npm i -g @prismalens/assayer after the first release
-npm i -g @openai/codex@0.162.1 @agentclientprotocol/codex-acp@2.1.1 && codex login   # the default engine
-gh auth login
-
-assayer doctor                             # what this machine has for a round
-assayer review                             # review your local changes before you push
-assayer review owner/repo#123              # review a pull request and print
-assayer review owner/repo#123 --post       # post the findings as you
+npm i -g @prismalens/assayer
+assayer review owner/repo#123              # review a pull request and print the findings
 ```
+
+The first review asks which engine to use (Codex, Claude Code or OpenCode) and saves your answer. If that engine is not installed, Assayer shows the `npm i -g` command for it and offers to run it; you then sign in to the engine once, the way you normally would. `assayer doctor` shows what this machine has.
+
+```bash
+assayer review owner/repo#123 --post       # post the findings on the pull request, as you
+assayer review                             # review your local changes before you push
+assayer config set engine claude-code      # change your default engine
+```
+
+From a checkout instead of npm: `cd runner && npm ci && npm link`.
 
 ## What a round looks like
 
-This is Assayer reviewing its own first pull request with Codex. It printed the round and posted nothing:
+Assayer reviewing [a demo pull request](https://github.com/Sumit1993/todo-app-api/pull/13) with Codex. The pull request has bugs put there on purpose; the output is the round's own, unedited:
 
 ```text
-assayer: prismalens/assayer#1 at ec52d77 with codex
-assayer-run: completed in 385s, 64 tool calls, 19 reads, 3 findings, summary=true
-completed: 3 finding(s) in 385s
-  plugin/skills/assayer-review/SKILL.md:47  Do not tell agents to wait for automatic thread resolution
-  README.md:12  Install the Codex CLI before invoking codex login
-  README.md:3  Remove the unsupported automatic follow-up promise
-
-## Code review
-🟠 Major — 3 inline findings ...
-Coverage: examined 8 of 8 reviewable files.
+assayer: Sumit1993/todo-app-api#13 at 1a881a5 with codex
+completed: 5 finding(s) in 382s
+  [Critical] src/todos/todos.service.ts:241  Await every bulk update before returning success
+  [Major] src/todos/todos.service.ts:210  Include the user ID in the page cache key
+  [Major] src/todos/todos.service.ts:217  Use a zero-based offset for the first page
+  [Major] src/todos/todos.controller.ts:40  Validate the bulk IDs before dereferencing them
+  [Major] src/todos/todos.controller.ts:36  Reject invalid pagination before calling the upstream API
 ```
 
 With `--post`, each finding lands as an inline comment ending in a hidden `assayer-finding` marker, and a summary comment gives the coverage. `assayer publish <round dir>` posts or resumes a round that already ran.
