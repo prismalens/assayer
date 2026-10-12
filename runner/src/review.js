@@ -26,7 +26,7 @@ import { KEYS, assayerHome, formatSettings, readSettings, resolveDefaults, write
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const USAGE = `usage:
   assayer review <owner/repo#N | PR URL> [--engine E] [--model M] [--post] [--again]
-                 [--fail-on critical|major|minor] [--ignore-repo-config] [--out DIR]
+                 [--fail-on critical|major|minor] [--full] [--ignore-repo-config] [--out DIR]
   assayer review [--base REF] [--head REV] [--engine E] [--model M]
                  [--fail-on critical|major|minor] [--ignore-repo-config] [--out DIR]
                                                          reviews local changes, prints only
@@ -67,7 +67,7 @@ export function parseArgs(argv) {
   }
   if (cmd === 'review' && (target === undefined || target.startsWith('--'))) return parseLocal(target === undefined ? [] : [target, ...rest]);
   if (cmd !== 'review' || !target) throw new Error(USAGE);
-  const o = { cmd, ...parseTarget(target), engine: null, model: null, post: false, again: false, ignoreRepoConfig: false, out: null, failOn: null };
+  const o = { cmd, ...parseTarget(target), engine: null, model: null, post: false, again: false, ignoreRepoConfig: false, out: null, failOn: null, full: false };
   for (let i = 0; i < rest.length; i += 1) {
     const a = rest[i];
     const need = () => { const v = rest[i + 1]; if (v === undefined) throw new Error(`${a} needs a value`); i += 1; return v; };
@@ -78,6 +78,7 @@ export function parseArgs(argv) {
     else if (a === '--ignore-repo-config') o.ignoreRepoConfig = true;
     else if (a === '--out') o.out = need();
     else if (a === '--fail-on') o.failOn = need();
+    else if (a === '--full') o.full = true;
     else throw new Error(`unknown argument ${a}\n${USAGE}`);
   }
   checkEngine(o.engine);
@@ -289,7 +290,7 @@ export function findingLines(findings, { tty = false } = {}) {
 }
 
 // Why a round did not complete, in words a first-time user can act on.
-export function failureLines(s) {
+export function failureLines(s, dir = null) {
   const hint = {
     'auth-failed': ENGINES[s.engine]?.install?.signIn ? `sign in to ${s.engine} once: ${ENGINES[s.engine].install.signIn}` : null,
     'rate-limited': 'the engine hit its usage limit; try again after it resets',
@@ -298,8 +299,13 @@ export function failureLines(s) {
     'model-unavailable': 'the model is not available to this account; pass --model or `assayer config set model <name>`',
   };
   const out = (s.errors ?? []).map((e) => `  ${e.failure_class}: ${String(e.message).split('\n')[0].slice(0, 200)}${e.reset_at ? ` (resets ${e.reset_at})` : ''}${hint[e.failure_class] ? `\n  -> ${hint[e.failure_class]}` : ''}`);
+  if (s.refused_size) {
+    let m = null;
+    try { m = /(\d+) reviewable line\(s\) \(max_reviewable_lines=(\d+)/.exec(readFileSync(path.join(dir ?? '', 'manifest-stderr.log'), 'utf8')); } catch { /* the plain line below still says what to do */ }
+    out.push(`  the change is too large for one round${m ? ` (${m[1]} reviewable lines, over ${m[2]})` : ''}; --full reviews it anyway, in a longer round`);
+  }
   if (s.conclusion === 'timed-out') out.push(`  the engine went quiet or ran past its time limit (${s.timed_out_by ?? 'timeout'})`);
-  if (!out.length && s.conclusion !== 'completed') out.push(`  no reason recorded; the engine's own log is ${path.join('<round dir>', 'engine-stderr.log')}`);
+  if (!out.length && s.conclusion !== 'completed' && !s.refused_size) out.push(`  no reason recorded; the engine's own log is ${path.join('<round dir>', 'engine-stderr.log')}`);
   return out;
 }
 
@@ -307,7 +313,7 @@ function printRound(dir) {
   const s = JSON.parse(readFileSync(path.join(dir, 'summary.json'), 'utf8'));
   const { events, findings } = readFindings(dir);
   if (s.conclusion !== 'completed') {
-    process.stdout.write([`${s.conclusion}: the round did not finish`, ...failureLines(s)].join('\n') + '\n');
+    process.stdout.write([`${s.conclusion}: the round did not finish`, ...failureLines(s, dir)].join('\n') + '\n');
     return;
   }
   const lines = [`${s.conclusion}: ${s.findings ?? 0} finding(s) in ${Math.round((s.wall_clock_ms ?? 0) / 1000)}s`];
@@ -433,7 +439,7 @@ export async function review(o, { log = (s) => process.stderr.write(s + '\n') } 
 
   const summary = await watched(dir, o.engine, log, (log) => runRound({
     cwd, prompt: path.join(dir, 'prompt.md'), out: dir, engine: o.engine, model: o.model, promptHash: prompt.hash,
-    stage: true, repo: o.repo, pr: String(o.pr), headSha, mode: 'review', ghToken: token, engineGh: 'offline',
+    stage: true, repo: o.repo, pr: String(o.pr), headSha, mode: o.full ? 'review-full' : 'review', ghToken: token, engineGh: 'offline',
     timeoutMs: (ENGINES[o.engine].timeoutMin ?? 20) * 60 * 1000, idleMs: (ENGINES[o.engine].idleMin ?? 8) * 60 * 1000,
   }, { log }));
   printRound(dir);

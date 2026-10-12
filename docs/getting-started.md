@@ -62,6 +62,7 @@ The hook never starts a review. It looks for a finished local round covering wha
 | `--again` | Review a head this engine already reviewed. |
 | `--ignore-repo-config` | Review a repository that has `.github/claude-review.yml` with the defaults. |
 | `--out DIR` | Keep the round in a new directory of your choosing. |
+| `--full` | Review a pull request over the size limit for one round (6,000 reviewable lines) anyway. The round takes longer. |
 | `--fail-on critical\|major\|minor` | Exit 4 when a finding is at or above that severity, for CI and the pre-push habit. |
 | `--base REF`, `--head REV` | Local review only: what to compare against, and a commit to review instead of the working tree. |
 

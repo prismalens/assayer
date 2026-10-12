@@ -182,4 +182,12 @@ describe('local prompt and CLI', () => {
     assert.equal(terminalMarkdown('## Code review\n**Cache** key `x`', false), '## Code review\n**Cache** key `x`');
     assert.equal(terminalMarkdown('## Code review\n**Cache** key `x`', true), '\x1b[1mCode review\x1b[22m\n\x1b[1mCache\x1b[22m key \x1b[36mx\x1b[39m');
   });
+
+  it('says a too-large change can be reviewed with --full, with the numbers', async () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), 'assayer-big-'));
+    writeFileSync(path.join(dir, 'manifest-stderr.log'), 'review manifest: 90 file(s), 8123 reviewable line(s) (max_reviewable_lines=6000, max_file_lines=2000), refused=True');
+    const lines = failureLines({ engine: 'codex', conclusion: 'refused', refused_size: true, errors: [] }, dir);
+    assert.deepEqual(lines, ['  the change is too large for one round (8123 reviewable lines, over 6000); --full reviews it anyway, in a longer round']);
+    assert.equal(parseArgs(['review', 'a/b#1', '--full']).full, true);
+  });
 });
