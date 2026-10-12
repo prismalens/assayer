@@ -215,3 +215,15 @@ export function renderCodexPrompt(template, { repo, pr, baseSha, headSha, local 
   if (left) throw new Error(`codex prompt left a placeholder: ${left.join(' ')}`);
   return text;
 }
+
+// codex.md tells the engine to read diffs with git, which Codex runs inside its own sandbox. An
+// engine that asks first is refused git by the policy and then files nothing; it reads the
+// staged diff and the files instead. Throws if codex.md drifts from these sentences.
+const GIT_DIFF = /- Review a file's change with `git diff [0-9a-f]{7,40} [0-9a-f]{7,40} -- <path>`\./;
+const GIT_OK = 'Reading files, local `git` commands, `rg` and `gh pr view`/`gh issue view` are fine.';
+export function forFileTools(text) {
+  if (!GIT_DIFF.test(text) || !text.includes(GIT_OK)) throw new Error('codex.md no longer has the git sentences forFileTools replaces');
+  return text
+    .replace(GIT_DIFF, "- The whole change is in `.claude-review.diff` at the checkout root, as a unified diff. Read it with your file-reading tool, in line ranges if it is long.")
+    .replace(GIT_OK, 'Read files and search with your file tools. Shell commands are refused, apart from `gh pr view`/`gh issue view`; never run `git`, and never give up filing because a command was refused.');
+}

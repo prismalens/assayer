@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 import { ENGINES, codexSandboxModeSet } from './engines.js';
 import { countBucket, createTelemetry, durationBucket } from './telemetry.js';
 import { doctor, formatDoctor } from './doctor.js';
-import { renderPrompt, renderCodexPrompt, promptHash, laneTokens } from './prompt.js';
+import { renderPrompt, renderCodexPrompt, promptHash, laneTokens, forFileTools } from './prompt.js';
 import { checkout } from './github.js';
 import { runRound } from './run.js';
 import { LIVENESS_PREFIX, postRound, withoutEngineCredit } from './poster.js';
@@ -420,7 +420,8 @@ export async function reviewLocal(o, { log = (s) => process.stderr.write(s + '\n
   const checkoutDir = path.join(dir, 'checkout');
   localCheckout(top, snap.head, checkoutDir);
   const repo = `local/${label}`;
-  const prompt = { text: renderCodexPrompt(readFileSync(path.join(HERE, '..', 'prompt', 'codex.md'), 'utf8'), { repo, pr: 0, baseSha: base.sha, headSha: snap.head, local: { label, dirty: snap.dirty } }) };
+  const rendered = renderCodexPrompt(readFileSync(path.join(HERE, '..', 'prompt', 'codex.md'), 'utf8'), { repo, pr: 0, baseSha: base.sha, headSha: snap.head, local: { label, dirty: snap.dirty } });
+  const prompt = { text: o.engine === 'codex' ? rendered : forFileTools(rendered) };
   prompt.hash = promptHash(prompt.text);
   writeFileSync(path.join(dir, 'prompt.md'), prompt.text);
   const round = { mode: 'local', repository: null, pr_number: null, local_path: top, head_sha: snap.head, head_tree: snap.tree, base_sha: base.sha, base_source: base.source, dirty: snap.dirty, engine: o.engine, model: o.model, where: 'local' };

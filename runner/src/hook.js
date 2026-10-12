@@ -77,11 +77,17 @@ export function prePush({ lines, rounds, mode, treeOf, isAncestor }) {
     }
     const serious = round.findings.filter((f) => atLeastMajor(f.body));
     if (!serious.length) { messages.push(`assayer: ${lref} reviewed, nothing major (${round.dir})`); continue; }
-    messages.push(`assayer: ${lref} has ${serious.length} major or critical finding(s) from ${round.dir}:`);
-    for (const f of serious) messages.push(`  ${f.path}:${f.line ?? '?'}`);
+    messages.push(`assayer: ${lref} has ${serious.length} major or critical finding(s) from round ${path.basename(round.dir)}:`);
+    for (const f of serious) {
+      const after = f.body.slice(f.body.indexOf('</details>') + 1);
+      const title = (/\*\*(.+?)\*\*/.exec(after)?.[1] ?? '').replace(/[\x00-\x1f]/g, ' ').slice(0, 100);
+      const sev = severityOf(f.body);
+      messages.push(`  [${sev[0].toUpperCase()}${sev.slice(1)}] ${f.path}:${f.line ?? '?'}  ${title}`);
+    }
     block = true;
   }
   if (block && mode === 'block') messages.push('assayer: push blocked (assayer.prepush=block); `git push --no-verify` skips the check');
+  else if (block) messages.push('assayer: pushing anyway; `git config assayer.prepush block` stops pushes like this');
   return { code: block && mode === 'block' ? 1 : 0, messages };
 }
 
