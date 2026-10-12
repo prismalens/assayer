@@ -9,7 +9,7 @@
 
 Assayer is open source code review that runs on your machine with your own Codex, Claude Code or OpenCode sign-in. It reviews a pull request, posts its findings inline under your own GitHub login, and can review what you are about to push before you push it. There is no hosted service and no extra API key.
 
-- **Your machine, your sign-in.** The engine runs locally with the account or key you already use. Assayer stores no model key, and the engine never gets a GitHub credential.
+- **Your machine, your sign-in.** The engine runs locally with the account or key you already use. Assayer stores no model key, passes the engine no GitHub credential, and only Assayer posts. The engine still runs as you: [what each engine can read](docs/how-it-works.md#what-the-engine-can-read).
 - **Before you push, too.** `assayer review` with no pull request reviews your uncommitted work in a snapshot, and an opt-in pre-push hook warns when what you push has no review or had a major finding.
 - **Engines are interchangeable.** Codex, Claude Code and OpenCode run over the [Agent Client Protocol](https://agentclientprotocol.com), so you switch with `--engine`.
 

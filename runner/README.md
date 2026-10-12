@@ -34,7 +34,7 @@ It refuses, before spending any quota, a PR that is closed, carries `claude_revi
 has this engine's review on its head (`--again` runs another), or whose repository has a
 `.github/claude-review.yml` it cannot apply yet (#182; `--ignore-repo-config` reviews with the
 workflow defaults). The round lives in `~/.assayer/reviews/<repo>-<pr>-<sha>-<time>/` unless
-`--out` names a new directory. The engine gets no GitHub credential.
+`--out` names a new directory. Assayer passes the engine no GitHub credential.
 
 ## Run one round
 

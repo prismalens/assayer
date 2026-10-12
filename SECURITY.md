@@ -41,14 +41,15 @@ Do **not** include real secrets, tokens, or private content in your report.
 Assayer is an open source code reviewer. It runs on the user's machine with their
 own engine sign-in (Codex, Claude Code, or OpenCode) over the Agent Client
 Protocol (ACP). It posts findings on pull requests under the user's own GitHub login
-(`gh`). The engine never receives a GitHub credential.
+(`gh`). Assayer never passes the engine a GitHub credential; what the engine can read on the machine is listed per engine in docs/how-it-works.md.
 
 ## Scope
 
 Reports in these areas are especially valuable:
 
-- **Credential isolation** — the engine receiving a GitHub credential, an API token,
-  or environment variables outside its explicit allowlist.
+- **Credential isolation** — Assayer passing the engine a GitHub credential, an API token,
+  or environment variables outside its explicit allowlist, or an engine reading outside the
+  checkout where docs/how-it-works.md says it cannot.
 - **Posting identity** — findings or summaries posting under an unexpected identity or
   outside the user's own GitHub login.
 - **The ACP command and permission policy** — a way to make the engine edit, delete, or
