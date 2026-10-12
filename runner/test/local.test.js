@@ -190,4 +190,11 @@ describe('local prompt and CLI', () => {
     assert.deepEqual(lines, ['  the change is too large for one round (8123 reviewable lines, over 6000); --full reviews it anyway, in a longer round']);
     assert.equal(parseArgs(['review', 'a/b#1', '--full']).full, true);
   });
+
+  it('a too-large local round is not told to use --full, which only a pull request takes', () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), 'assayer-big-local-'));
+    writeFileSync(path.join(dir, 'round.json'), JSON.stringify({ mode: 'local' }));
+    const [line] = failureLines({ engine: 'codex', conclusion: 'refused', refused_size: true, errors: [] }, dir);
+    assert.match(line, /smaller commits with --head, or push it and review the pull request with --full/);
+  });
 });

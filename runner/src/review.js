@@ -218,7 +218,7 @@ export async function publish(dir, opts = {}) {
     return await publishOnce(dir, { ...opts, fetch: retryingFetch(opts.fetch ?? globalThis.fetch) });
   } catch (e) {
     if (e?.message !== 'fetch failed') throw e;
-    throw new Error(`could not reach GitHub (${e.cause?.code ?? e.cause?.message ?? 'network error'}). What was posted is recorded; \`assayer publish ${path.basename(dir)}\` posts the rest`);
+    throw new Error(`could not reach GitHub (${e.cause?.code ?? e.cause?.message ?? 'network error'}). \`assayer publish ${path.basename(dir)}\` posts the rest; a comment whose reply was lost in the failure may post twice`);
   }
 }
 
@@ -302,7 +302,9 @@ export function failureLines(s, dir = null) {
   if (s.refused_size) {
     let m = null;
     try { m = /(\d+) reviewable line\(s\) \(max_reviewable_lines=(\d+)/.exec(readFileSync(path.join(dir ?? '', 'manifest-stderr.log'), 'utf8')); } catch { /* the plain line below still says what to do */ }
-    out.push(`  the change is too large for one round${m ? ` (${m[1]} reviewable lines, over ${m[2]})` : ''}; --full reviews it anyway, in a longer round`);
+    let local = false;
+    try { local = JSON.parse(readFileSync(path.join(dir ?? '', 'round.json'), 'utf8')).mode === 'local'; } catch { /* treat as a pull request */ }
+    out.push(`  the change is too large for one round${m ? ` (${m[1]} reviewable lines, over ${m[2]})` : ''}; ${local ? 'review it in smaller commits with --head, or push it and review the pull request with --full' : '--full reviews it anyway, in a longer round'}`);
   }
   if (s.conclusion === 'timed-out') out.push(`  the engine went quiet or ran past its time limit (${s.timed_out_by ?? 'timeout'})`);
   if (!out.length && s.conclusion !== 'completed' && !s.refused_size) out.push(`  no reason recorded; the engine's own log is ${path.join('<round dir>', 'engine-stderr.log')}`);

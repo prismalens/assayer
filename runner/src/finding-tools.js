@@ -51,7 +51,7 @@ if (which === 'github_inline_comment') {
   }, async (input) => {
     // Refused at filing time, as GitHub refuses it at posting time, so the engine re-files on a
     // diff line instead of leaving a stray copy. No diff to check against: recorded as before.
-    const problem = diff && anchorProblem(diff, input);
+    const problem = diff && anchorProblem(diff, input, process.env.ASSAYER_CHECKOUT || null);
     if (problem) return { isError: true, content: [{ type: 'text', text: `Not recorded: ${problem}.` }] };
     record('create_inline_comment', input);
     return { content: [{ type: 'text', text: JSON.stringify({ ok: true, recorded: true }) }] };

@@ -46,3 +46,12 @@ describe('diff lines GitHub anchors on', () => {
     assert.match(anchorProblem(files, { path: 'src/b.ts', line: 1 }), /not in this review's diff.*src\/a\.ts, old\.txt, new\.md/);
   });
 });
+
+describe('paths and ranges the way the poster and GitHub read them', () => {
+  const files = hunkRanges(DIFF);
+  it('matches ./ and absolute checkout paths, and refuses a range across hunks', () => {
+    assert.equal(anchorProblem(files, { path: './src/a.ts', line: 210 }), null);
+    assert.equal(anchorProblem(files, { path: '/co/src/a.ts', line: 210 }, '/co'), null);
+    assert.match(anchorProblem(files, { path: 'src/a.ts', startLine: 8, line: 210 }), /span two hunks.*\(202-241\)/);
+  });
+});

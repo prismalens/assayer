@@ -66,7 +66,7 @@ export function whichGh(pathVar) {
 }
 
 function mcpServer(name, toolLog, diffPath = null) {
-  const env = [{ name: 'ASSAYER_TOOL_LOG', value: toolLog }, ...(diffPath ? [{ name: 'ASSAYER_DIFF', value: diffPath }] : [])];
+  const env = [{ name: 'ASSAYER_TOOL_LOG', value: toolLog }, ...(diffPath ? [{ name: 'ASSAYER_DIFF', value: diffPath }, { name: 'ASSAYER_CHECKOUT', value: path.dirname(diffPath) }] : [])];
   return { name, command: process.execPath, args: [path.join(HERE, 'finding-tools.js'), name], env };
 }
 
