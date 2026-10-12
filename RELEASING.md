@@ -23,10 +23,9 @@ npm i -g ./prismalens-assayer-<version>.tgz
 | Step | Command | Pass when |
 | --- | --- | --- |
 | Starts | `assayer --version` | prints `<version>` |
-| Telemetry notice | `assayer doctor` in a terminal | the first run prints the notice; `assayer telemetry status` then reads `on` with nothing sent |
 | Doctor | `assayer doctor` | lists node, git, python3, gh; says which engines are missing |
 | Engine | install one engine from the README and sign in; `assayer doctor` | that engine reads ready, exit 0 |
-| Review | `assayer review <sandbox-owner>/<sandbox-repo>#<n>` | the round completes, prints findings and coverage, posts nothing |
+| Review | `assayer review <sandbox-owner>/<sandbox-repo>#<n>` in a terminal | the telemetry notice prints first; the round completes, prints findings and coverage, posts nothing |
 | Post | `assayer publish <round dir>` | findings land inline under your login, each ending in the `assayer-finding` marker |
 | Re-check | push a fix for one finding, then `assayer review ... --again --post` | the fixed thread gets a reply naming the commit and is resolved |
 | Telemetry | `assayer telemetry status` | lists `install_active` and `round_finished` with no repository name, path or login |
