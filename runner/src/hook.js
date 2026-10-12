@@ -2,9 +2,9 @@
 // a hook that slow gets bypassed, so the hook only reads what `assayer review` already found
 // for the tree being pushed. It warns by default, blocks only when asked, and fails open.
 import { existsSync, readFileSync, readdirSync, rmSync, writeFileSync, chmodSync, mkdirSync } from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { git, isZero, severityOf } from './local.js';
+import { assayerHome } from './settings.js';
 
 export const MARKER = '# assayer pre-push hook';
 const SCRIPT = `#!/bin/sh
@@ -42,7 +42,7 @@ export function hookMode(env = process.env, cwd = process.cwd()) {
 }
 
 // Completed local rounds, newest first, with what the hook needs to match and report them.
-export function localRounds(root = path.join(os.homedir(), '.assayer', 'reviews')) {
+export function localRounds(root = path.join(assayerHome(), 'reviews')) {
   if (!existsSync(root)) return [];
   const out = [];
   for (const name of readdirSync(root)) {

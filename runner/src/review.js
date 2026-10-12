@@ -5,7 +5,6 @@
 // `assayer publish <dir>` posts, or resumes posting, a round that already ran.
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync, realpathSync } from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ENGINES } from './engines.js';
@@ -21,7 +20,7 @@ export { severityOf };
 import { hookCommand } from './hook.js';
 import { startProgress } from './progress.js';
 import { LABELS, missingFor, offerSetup, setupHint } from './setup.js';
-import { KEYS, formatSettings, readSettings, resolveDefaults, writeSetting } from './settings.js';
+import { KEYS, assayerHome, formatSettings, readSettings, resolveDefaults, writeSetting } from './settings.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const USAGE = `usage:
@@ -314,7 +313,7 @@ export async function reviewLocal(o, { log = (s) => process.stderr.write(s + '\n
   const top = repoTop(cwd);
   const label = path.basename(top).replace(/[^\w.-]/g, '-') || 'repo';
   const stamp = Date.now();
-  const dir = path.resolve(o.out ?? path.join(os.homedir(), '.assayer', 'reviews', `local-${label}-${stamp}`));
+  const dir = path.resolve(o.out ?? path.join(assayerHome(), 'reviews', `local-${label}-${stamp}`));
   if (existsSync(path.join(dir, 'round.json'))) throw new Error(`${dir} already holds a round; pick a new --out`);
   mkdirSync(dir, { recursive: true });
   const snap = o.head
@@ -366,7 +365,7 @@ export async function review(o, { log = (s) => process.stderr.write(s + '\n') } 
   const cfg = gh(['api', `repos/${o.repo}/contents/.github/claude-review.yml?ref=${pr.base.sha}`], { allow404: true });
   if (cfg !== null && !o.ignoreRepoConfig) throw refusal('repo_config', `${o.repo} has .github/claude-review.yml, which a local round cannot apply yet (#182); pass --ignore-repo-config to review with the workflow defaults`);
 
-  const dir = path.resolve(o.out ?? path.join(os.homedir(), '.assayer', 'reviews', `${o.repo.replace('/', '-')}-${o.pr}-${headSha.slice(0, 7)}-${Date.now()}`));
+  const dir = path.resolve(o.out ?? path.join(assayerHome(), 'reviews', `${o.repo.replace('/', '-')}-${o.pr}-${headSha.slice(0, 7)}-${Date.now()}`));
   // One directory, one round: a reused one would carry the last round's publish journal.
   if (existsSync(path.join(dir, 'round.json'))) throw new Error(`${dir} already holds a round; pick a new --out`);
   mkdirSync(dir, { recursive: true });

@@ -82,4 +82,6 @@ assayer config unset model
 
 A flag always wins for that round.
 
+Assayer keeps its defaults, telemetry state and rounds in `~/.assayer`; set `ASSAYER_HOME` to keep them somewhere else. Engine sign-ins are the engines' own and stay where they are.
+
 `assayer --version` prints the version.

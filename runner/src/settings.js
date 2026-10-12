@@ -13,7 +13,10 @@ export const KEYS = {
   'fail-on': (v) => (SEVERITIES.includes(v) ? null : `fail-on takes ${SEVERITIES.join(', ')}`),
 };
 
-export function settingsFile(dir = path.join(os.homedir(), '.assayer')) {
+// Where Assayer keeps its own state: defaults, telemetry and rounds. Engine sign-ins live elsewhere.
+export const assayerHome = (env = process.env) => env.ASSAYER_HOME || path.join(os.homedir(), '.assayer');
+
+export function settingsFile(dir = assayerHome()) {
   return path.join(dir, 'config.json');
 }
 

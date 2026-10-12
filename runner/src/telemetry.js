@@ -4,9 +4,9 @@
 // request is built. Never sent: repository names, paths, logins, finding text, model output.
 import { randomUUID } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { assayerHome } from './settings.js';
 
 // The shared PrismaLens EU project; a public, ingest-only key meant to ship in clients.
 const POSTHOG_KEY = 'phc_pCgmw347sL5wFdtsf5eTG4NEki5DyyFwHNXiyUjT5UcW';
@@ -81,7 +81,7 @@ names, paths, logins, code or findings. This run sends nothing.
 Turn it off with \`assayer telemetry off\`, ASSAYER_TELEMETRY=off or DO_NOT_TRACK=1.`;
 
 export function createTelemetry({
-  dir = path.join(os.homedir(), '.assayer'), env = process.env, fetchImpl = fetch,
+  dir = assayerHome(), env = process.env, fetchImpl = fetch,
   now = () => new Date(), isTTY = Boolean(process.stderr.isTTY), version = '0.0.0',
   log = (s) => process.stderr.write(s + '\n'),
 } = {}) {

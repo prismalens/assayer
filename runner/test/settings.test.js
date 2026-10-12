@@ -63,3 +63,11 @@ describe('defaults in ~/.assayer/config.json', () => {
     assert.throws(() => parseArgs(['config', 'set', 'colour', 'red']), /keys: engine, model, fail-on/);
   });
 });
+
+describe('ASSAYER_HOME', () => {
+  it('moves only Assayer state', async () => {
+    const { assayerHome } = await import('../src/settings.js');
+    assert.equal(assayerHome({ ASSAYER_HOME: '/x/state' }), '/x/state');
+    assert.equal(assayerHome({}), path.join(os.homedir(), '.assayer'));
+  });
+});
