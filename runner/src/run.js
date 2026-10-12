@@ -84,7 +84,7 @@ export async function runRound(opts, { log = (s) => process.stderr.write(s + '\n
   const stderrPath = path.join(out, 'engine-stderr.log');
   for (const f of [rawPath, toolLog, stderrPath]) writeFileSync(f, ''); // fresh per run, never appended across runs
 
-  const row = ENGINES[opts.engine];
+  const row = opts.row ?? ENGINES[opts.engine]; // opts.row: a test points a round at a fake agent
   if (!opts.model && row.defaultModel) opts.model = row.defaultModel;
 
   // The caller decides what is reviewable, never the agent (#105): the manifest and the diff
