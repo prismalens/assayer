@@ -4,7 +4,7 @@
 import { spawnSync } from 'node:child_process';
 import { accessSync, constants } from 'node:fs';
 import path from 'node:path';
-import { ENGINES, codexSandboxModeSet } from './engines.js';
+import { ENGINES, codexSandboxModeSet, installArgs } from './engines.js';
 
 const MIN_NODE = 24;
 
@@ -47,7 +47,7 @@ export function doctor({ probe = defaultProbe, which = onPath, nodeVersion = pro
     const note = (ready && row.admitted?.version && version && version !== row.admitted.version ? `; tested on ${row.admitted.version}` : '')
       + (ready && id === 'codex' && codexSandboxModeSet() ? '; your sandbox_mode turns off its credential deny list' : '');
     const fix = [...new Set([!cli?.ok && row.install?.cli, !adapter && row.install?.adapter].filter(Boolean))];
-    add(`engine ${id}`, ready, ready ? `${row.cli} ${version ?? ''}${note}`.trim() : `missing ${missing.join(' and ')}${fix.length ? `: npm i -g ${fix.join(' ')}` : ''}`, false);
+    add(`engine ${id}`, ready, ready ? `${row.cli} ${version ?? ''}${note}`.trim() : `missing ${missing.join(' and ')}${fix.length ? `: npm ${installArgs(fix.map((pkg) => ({ pkg }))).join(' ')}` : ''}`, false);
     return ready;
   });
 

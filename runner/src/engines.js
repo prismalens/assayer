@@ -151,6 +151,15 @@ export const ENGINES = Object.freeze({
   },
 });
 
+// npm 11 skips install scripts unless allowed; Claude Code's and OpenCode's postinstalls put their
+// native binaries in place.
+const NEEDS_SCRIPTS = ['@anthropic-ai/claude-code', 'opencode-ai'];
+export function installArgs(missing) {
+  const pkgs = missing.map((m) => m.pkg);
+  const allow = pkgs.filter((p) => NEEDS_SCRIPTS.some((n) => p === n || p.startsWith(`${n}@`)));
+  return ['i', '-g', ...pkgs, ...allow.map((p) => `--allow-scripts=${p.replace(/(.)@[^/]*$/, '$1')}`)];
+}
+
 // `extraAllow` names one credential variable the caller handed this round (--credential-env),
 // so a key under a name of the operator's choosing reaches the engine and nothing else does.
 export function engineEnv(row, source = process.env, extraAllow = []) {

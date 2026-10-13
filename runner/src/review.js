@@ -476,7 +476,7 @@ export async function review(o, { log = (s) => process.stderr.write(s + '\n') } 
 
   const summary = await watched(dir, o.engine, log, (log) => runRound({
     cwd, prompt: path.join(dir, 'prompt.md'), out: dir, engine: o.engine, model: o.model, promptHash: prompt.hash,
-    stage: true, repo: o.repo, pr: String(o.pr), headSha, mode: o.full ? 'review-full' : 'review', ghToken: token, engineGh: 'offline',
+    stage: true, repo: o.repo, pr: String(o.pr), headSha, baseSha, mode: o.full ? 'review-full' : 'review', ghToken: token, engineGh: 'offline',
     timeoutMs: (ENGINES[o.engine].timeoutMin ?? 20) * 60 * 1000, idleMs: (ENGINES[o.engine].idleMin ?? 8) * 60 * 1000,
   }, { log }));
   printRound(dir);

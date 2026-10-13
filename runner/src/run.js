@@ -4,8 +4,8 @@
 // allowlist, and write raw.jsonl (every ACP message), tool-log.jsonl (every comment tool
 // call), events.jsonl (assayer/v1) and summary.json (turns, usage, wall clock) to --out.
 // Exit code: 0 completed, 3 engine error, 4 timed out, 2 usage.
-import { spawn } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync, statSync, copyFileSync, chmodSync, accessSync, constants, realpathSync } from 'node:fs';
+import { execFileSync, spawn } from 'node:child_process';
+import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync, statSync, copyFileSync, chmodSync, accessSync, constants, realpathSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Writable, Readable } from 'node:stream';
@@ -117,6 +117,7 @@ export async function runRound(opts, { log = (s) => process.stderr.write(s + '\n
     log('assayer-run: the manifest refused this pull request by size; no engine started');
     return summary;
   }
+  if (opts.baseSha && opts.headSha) pinInstructionFiles(cwd, opts.baseSha, opts.headSha);
   row.sealCheckout?.(cwd, process.env);
   const source = opts.engineGh === 'offline' ? Object.fromEntries(Object.entries(process.env).filter(([k]) => k !== 'GH_TOKEN' && k !== 'GITHUB_TOKEN')) : process.env;
   const baseEnv = engineEnv(row, source, opts.credentialEnv ? [opts.credentialEnv] : []);
@@ -267,4 +268,19 @@ export function unresolvedRefusals(refused, filed) {
   return refused
     .filter((r) => !filed.some((f) => f.path === r.path && (r.line == null || f.line == null || Math.abs(f.line - r.line) <= 3)))
     .map((r) => ({ why: `refused when filed and never re-filed: ${String(r.problem).slice(0, 160)}`, tool: 'create_inline_comment', refused_filing: true, path: r.path ?? null, line: r.line ?? null }));
+}
+
+// The prompts treat AGENTS.md and CLAUDE.md as the repository's rules, so a pull request could
+// rewrite them to excuse its own defect (adversary OBJ-020). The checkout keeps the base commit's
+// versions; the pull request's changes to them are still reviewed in the staged diff.
+export function pinInstructionFiles(cwd, baseSha, headSha) {
+  const git = (args) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+  const changed = git(['diff', '--name-only', '-z', '--no-renames', baseSha, headSha]).split('\0').filter((p) => /(^|\/)(AGENTS|CLAUDE)\.md$/.test(p));
+  for (const rel of changed) {
+    const file = path.join(cwd, rel);
+    let base = null;
+    try { base = execFileSync('git', ['show', `${baseSha}:${rel}`], { cwd, stdio: ['ignore', 'pipe', 'ignore'] }); } catch { /* added by the pull request */ }
+    if (base === null) rmSync(file, { force: true }); else writeFileSync(file, base);
+  }
+  return changed;
 }

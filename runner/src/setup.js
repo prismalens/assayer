@@ -2,7 +2,7 @@
 // npm command for it, and on a terminal an offer to run it. The engine's own sign-in stays
 // the user's to do; Assayer only names the command.
 import { spawnSync } from 'node:child_process';
-import { ENGINES } from './engines.js';
+import { ENGINES, installArgs } from './engines.js';
 import { onPath } from './doctor.js';
 
 export const LABELS = { codex: 'Codex', 'claude-code': 'Claude Code', opencode: 'OpenCode' };
@@ -15,14 +15,7 @@ export function missingFor(engine, which = onPath) {
   return out;
 }
 
-// npm 11 skips install scripts unless allowed; Claude Code's and OpenCode's postinstalls put their
-// native binaries in place.
-const NEEDS_SCRIPTS = ['@anthropic-ai/claude-code', 'opencode-ai'];
-export function installArgs(missing) {
-  const pkgs = missing.map((m) => m.pkg);
-  const allow = pkgs.filter((p) => NEEDS_SCRIPTS.some((n) => p === n || p.startsWith(`${n}@`)));
-  return ['i', '-g', ...pkgs, ...allow.map((p) => `--allow-scripts=${p.replace(/(.)@[^/]*$/, '$1')}`)];
-}
+export { installArgs };
 export const installCommand = (missing) => `npm ${installArgs(missing).join(' ')}`;
 
 export function setupHint(engine, missing) {
