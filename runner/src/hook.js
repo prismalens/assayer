@@ -52,8 +52,7 @@ export function localRounds(root = path.join(assayerHome(), 'reviews')) {
       const summary = JSON.parse(readFileSync(path.join(dir, 'summary.json'), 'utf8'));
       if (round.mode !== 'local' || summary.conclusion !== 'completed') continue;
       const findings = readFileSync(path.join(dir, 'events.jsonl'), 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)).filter((e) => e.type === 'finding');
-      const withheld = (summary.dropped ?? []).filter((d) => d.refused_filing).length;
-      out.push({ dir, round, findings, withheld, mtime: Number(name.match(/-(\d+)$/)?.[1] ?? 0) });
+      out.push({ dir, round, findings, mtime: Number(name.match(/-(\d+)$/)?.[1] ?? 0) });
     } catch { /* an unfinished or foreign directory */ }
   }
   return out.sort((a, b) => b.mtime - a.mtime);
@@ -77,11 +76,6 @@ export function prePush({ lines, rounds, mode, treeOf, isAncestor }) {
       continue;
     }
     const serious = round.findings.filter((f) => atLeastMajor(f.body));
-    if (round.withheld) {
-      messages.push(`assayer: ${lref}'s round ${path.basename(round.dir)} has ${round.withheld} finding(s) the engine filed in a form Assayer refused and never re-filed; review again before trusting it`);
-      block = true;
-    }
-    if (!serious.length && round.withheld) continue;
     if (!serious.length) { messages.push(`assayer: ${lref} reviewed, nothing major (${round.dir})`); continue; }
     messages.push(`assayer: ${lref} has ${serious.length} major or critical finding(s) from round ${path.basename(round.dir)}:`);
     for (const f of serious) {

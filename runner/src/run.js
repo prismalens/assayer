@@ -5,7 +5,7 @@
 // call), events.jsonl (assayer/v1) and summary.json (turns, usage, wall clock) to --out.
 // Exit code: 0 completed, 3 engine error, 4 timed out, 2 usage.
 import { execFileSync, spawn } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync, statSync, copyFileSync, chmodSync, accessSync, constants, realpathSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync, statSync, lstatSync, copyFileSync, chmodSync, accessSync, constants, realpathSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Writable, Readable } from 'node:stream';
@@ -236,11 +236,6 @@ export async function runRound(opts, { log = (s) => process.stderr.write(s + '\n
   const tl = readToolLog(toolLog);
   const wallClockMs = Date.now() - started;
   const events = mapper.finish({ toolLog: tl.entries, wallClockMs, conclusion });
-  // A finding the tool refused and the engine never re-filed near the same line is withheld, not
-  // gone: the verdict and the pre-push hook count it (adversary OBJ-021).
-  const accepted = tl.entries.filter((e) => e.tool === 'create_inline_comment' && typeof e.input?.path === 'string')
-    .map((e) => ({ path: path.relative(cwd, path.resolve(cwd, e.input.path)), line: e.input.line ?? null, body: e.input.body, at: e.at }));
-  mapper.dropped.push(...unresolvedRefusals(readRefused(`${toolLog}.refused`).map((r) => ({ ...r, path: typeof r.path === 'string' ? path.relative(cwd, path.resolve(cwd, r.path)) : r.path })), accepted));
   writeFileSync(path.join(out, 'events.jsonl'), events.map((e) => JSON.stringify(e)).join('\n') + '\n');
   const summary = {
     engine: opts.engine, model: opts.model, cwd, conclusion: events.at(-1).conclusion, stop_reason: mapper.stopReason,
@@ -262,20 +257,7 @@ if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.me
     .catch((e) => { process.stderr.write(`assayer-run: ${e.message}\n`); process.exit(2); });
 }
 
-function readRefused(file) {
-  try { return readFileSync(file, 'utf8').split('\n').filter(Boolean).flatMap((l) => { try { return [JSON.parse(l)]; } catch { return []; } }); } catch { return []; }
-}
 
-// Resolved only by a finding filed after the refusal, near it, that says the same thing: an
-// unrelated nearby finding does not stand in for it (adversary OBJ-021).
-export function unresolvedRefusals(refused, filed) {
-  const words = (t) => new Set(String(t ?? '').toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 2));
-  const same = (a, b) => { const x = words(a); const y = words(b); let n = 0; for (const w of x) if (y.has(w)) n += 1; return x.size && y.size ? n / (x.size + y.size - n) >= 0.3 : false; };
-  return refused
-    .filter((r) => !filed.some((f) => f.path === r.path && (!r.at || !f.at || f.at >= r.at)
-      && (r.line == null || f.line == null || Math.abs(f.line - r.line) <= 3) && same(r.body, f.body)))
-    .map((r) => ({ why: `refused when filed and never re-filed: ${String(r.problem).slice(0, 160)}`, tool: 'create_inline_comment', refused_filing: true, path: r.path ?? null, line: r.line ?? null }));
-}
 
 // The prompts treat AGENTS.md and CLAUDE.md as the repository's rules, so a pull request could
 // rewrite them to excuse its own defect (adversary OBJ-020). The checkout keeps the base commit's
@@ -287,12 +269,16 @@ export function pinInstructionFiles(cwd, baseSha, headSha) {
     const file = path.join(cwd, rel);
     let base = null;
     try { base = execFileSync('git', ['show', `${baseSha}:${rel}`], { cwd, stdio: ['ignore', 'pipe', 'ignore'] }); } catch { /* added by the pull request */ }
-    // A file under a directory the pull request deleted or replaced is restored where it can be,
-    // and otherwise left out: an instruction file is never a reason to abort the round (OBJ-023).
+    // Only a plain file or link is ever replaced or removed. A path the pull request turned into a
+    // directory keeps its contents, and a restore that cannot be made is skipped, never fatal
+    // (adversary OBJ-023, OBJ-025).
+    let kind = null;
+    try { const st = lstatSync(file); kind = st.isDirectory() ? 'dir' : 'file'; } catch { kind = null; }
+    if (kind === 'dir') continue;
     try {
-      if (base === null) rmSync(file, { force: true, recursive: true });
-      else { mkdirSync(path.dirname(file), { recursive: true }); rmSync(file, { force: true, recursive: true }); writeFileSync(file, base); }
-    } catch { try { rmSync(file, { force: true, recursive: true }); } catch { /* the path is not ours to clear */ } }
+      if (base === null) { if (kind) rmSync(file, { force: true }); }
+      else { mkdirSync(path.dirname(file), { recursive: true }); writeFileSync(file, base); }
+    } catch { /* a parent that is now a file: the base rules cannot be restored there */ }
   }
   return changed;
 }

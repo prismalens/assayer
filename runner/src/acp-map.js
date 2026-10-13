@@ -169,23 +169,18 @@ export class SessionMapper {
     }
   }
 
-  // An engine that re-files a finding leaves a copy on the same or next line with nearly the same
-  // title; only those merge. Distinct defects sharing vocabulary stay, so differently worded
-  // copies may post: a lost defect costs more than a repeated one (adversary OBJ-019).
+  // A finding filed twice, identically (same file, side and line, same title), posts once. Nothing
+  // looser merges: every similarity rule tried also merged distinct defects (adversary OBJ-019).
   #mergeDuplicates() {
-    const rank = (b) => { const m = /_(🔴 Critical|🟠 Major|🟡 Minor)_/u.exec(b ?? ''); return m ? ['🔴 Critical', '🟠 Major', '🟡 Minor'].indexOf(m[1]) : 1; };
-    const found = this.events.map((e, i) => ({ e, i, words: titleWords(e.body) })).filter(({ e }) => e.type === 'finding' && Number.isInteger(e.line));
-    const groups = [];
-    for (const f of found) {
-      const g = groups.find((x) => x.key === `${f.e.path}|${f.e.side}` && x.members.some((m) => Math.abs(m.e.line - f.e.line) <= 1 && similar(m.words, f.words)));
-      if (g) g.members.push(f); else groups.push({ key: `${f.e.path}|${f.e.side}`, members: [f] });
-    }
+    const seen = new Map();
     const drop = new Set();
-    for (const { members } of groups) {
-      if (members.length < 2) continue;
-      const keep = members.reduce((k, f) => (rank(f.e.body) < rank(k.e.body) || (rank(f.e.body) === rank(k.e.body) && f.i < k.i) ? f : k));
-      for (const f of members) if (f !== keep) { drop.add(f.i); this.dropped.push({ why: `duplicate of the finding at ${keep.e.path}:${keep.e.line}`, merged: true, line: f.e.line }); }
-    }
+    this.events.forEach((e, i) => {
+      if (e.type !== 'finding' || !Number.isInteger(e.line)) return;
+      const title = [...titleWords(e.body)].join(' ');
+      if (!title) return;
+      const key = `${e.path}|${e.side}|${e.line}|${title}`;
+      if (seen.has(key)) { drop.add(i); this.dropped.push({ why: `identical to the finding at ${e.path}:${e.line}`, merged: true, line: e.line }); } else seen.set(key, i);
+    });
     if (drop.size) this.events = this.events.filter((_, i) => !drop.has(i));
   }
 
@@ -275,9 +270,4 @@ function titleWords(body) {
   const after = String(body ?? '').slice(String(body ?? '').indexOf('</details>') + 1);
   const title = /\*\*(.+?)\*\*/.exec(after)?.[1] ?? '';
   return new Set(title.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 2 && !STOP.has(w)).map((w) => w.replace(/(?<=..)s$/, '')));
-}
-function similar(a, b) {
-  if (!a.size || !b.size) return false;
-  let n = 0; for (const w of a) if (b.has(w)) n += 1;
-  return n / (a.size + b.size - n) >= 0.6;
 }

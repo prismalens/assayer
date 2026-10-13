@@ -234,9 +234,10 @@ test('copies of one finding on neighbouring lines merge to the most severe; dist
   assert.equal(withheldCount({ dropped: m.dropped }), 0, 'merged copies are not reported as withheld');
 });
 
-test('a re-filed copy with nearly the same title merges; forged tokens and plaintext tokens stay apart', () => {
-  const f = (line, sev, t) => ({ tool: 'create_inline_comment', input: { path: 'src/a.ts', line, body: `_🔒 Security & Privacy_ | _${sev}_ | _⚡ Quick win_\n\n**${t}**` } });
+test('only an identical re-filing merges; distinct defects on one or adjacent lines all stay', () => {
+  const f = (line, t) => ({ tool: 'create_inline_comment', input: { path: 'src/a.ts', line, body: `_🔒 Security & Privacy_ | _🔴 Critical_ | _⚡ Quick win_\n\n**${t}**\n\n${t} body` } });
   const m = mk();
-  const evs = m.finish({ toolLog: [f(10, '🔴 Critical', 'Login accepts forged tokens'), f(11, '🟠 Major', 'Login logs plaintext tokens'), f(20, '🟠 Major', 'Cache key omits userId'), f(21, '🔴 Critical', 'Cache key omits the userId')] });
-  assert.deepEqual(evs.filter((e) => e.type === 'finding').map((e) => e.line), [10, 11, 21]);
+  const evs = m.finish({ toolLog: [f(10, 'Cache key omits userId'), f(11, 'Cache key omits tenantId'), f(20, 'Login accepts forged tokens'), f(20, 'Login logs plaintext tokens'), f(30, 'Cache key omits userId'), f(30, 'Cache key omits userId')] });
+  assert.deepEqual(evs.filter((e) => e.type === 'finding').map((e) => e.line), [10, 11, 20, 20, 30]);
+  assert.equal(m.dropped.filter((d) => d.merged).length, 1);
 });

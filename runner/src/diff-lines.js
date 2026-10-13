@@ -39,11 +39,11 @@ export function anchorProblem(files, { path: raw, line, startLine, side = 'RIGHT
   // GitHub takes a range only within one hunk.
   const hunk = ranges.find(([lo, hi]) => line >= lo && line <= hi);
   if (!bad.length && Number.isInteger(startLine) && !(startLine >= hunk[0] && startLine <= hunk[1])) {
-    return `lines ${startLine}-${line} of ${path} span two hunks; GitHub takes a range only within one (${hunk[0]}-${hunk[1]}). Re-file on lines inside one hunk`;
+    return `lines ${startLine}-${line} of ${path} span two hunks; GitHub takes a range only within one (${hunk[0]}-${hunk[1]})`;
   }
   if (bad.length) {
     const where = ranges.map(([lo, hi]) => (lo === hi ? `${lo}` : `${lo}-${hi}`)).join(', ') || 'none';
-    return `line ${bad[0]} of ${path} is outside the diff on the ${side} side; the diff's ${side} lines are ${where}. Re-file the finding on the line where the defect is`;
+    return `line ${bad[0]} of ${path} is outside the diff on the ${side} side; the diff's ${side} lines are ${where}.`;
   }
   return null;
 }

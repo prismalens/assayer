@@ -52,14 +52,6 @@ describe('pre-push hook', () => {
     assert.match(run(line, [round([finding('🟠 Major')])], 'block').messages.at(-1), /--no-verify/);
   });
 
-  it('does not pass a round whose engine left a refused finding unfiled', () => {
-    const line = [`refs/heads/x ${A} refs/heads/x ${R}`];
-    const r = run(line, [{ ...round([]), withheld: 1 }], 'block');
-    assert.equal(r.code, 1);
-    assert.match(r.messages[0], /refused and never re-filed/);
-    assert.equal(run(line, [{ ...round([]), withheld: 0 }], 'block').code, 0);
-  });
-
   it('treats a round whose base is not behind the remote as no review, and skips deletes', () => {
     const line = [`refs/heads/x ${A} refs/heads/x ${R}`];
     const r = run(line, [round([])], 'block', false);

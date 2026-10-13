@@ -51,16 +51,13 @@ if (which === 'github_inline_comment') {
       commitId: z.string().optional().describe('Leave this out: Assayer uses the head commit.'),
     },
   }, async (input) => {
-    // Refused at filing time, as GitHub refuses it at posting time, so the engine re-files on a
-    // diff line instead of leaving a stray copy. No diff to check against: recorded as before.
-    const problem = formatProblem(input.body) ?? (diff && anchorProblem(diff, input, process.env.ASSAYER_CHECKOUT || null));
-    if (problem) {
-      const body = typeof input.body === 'string' && !looksLikeSecret(input.body) ? input.body.slice(0, 600) : null;
-      appendFileSync(`${log}.refused`, JSON.stringify({ at: new Date().toISOString(), path: input.path, line: input.line ?? null, body, problem }) + '\n');
-      return { isError: true, content: [{ type: 'text', text: `Not recorded: ${problem}.` }] };
-    }
+    // Every finding is recorded: a refused one could be lost if the engine never re-filed it, and
+    // no heuristic told a re-filing from a new defect (adversary OBJ-019, OBJ-021). A finding off
+    // the diff posts as a plain comment; the reply says what was off, for the next finding.
     record('create_inline_comment', input);
-    return { content: [{ type: 'text', text: JSON.stringify({ ok: true, recorded: true }) }] };
+    const problem = formatProblem(input.body) ?? (diff && anchorProblem(diff, input, process.env.ASSAYER_CHECKOUT || null));
+    const note = problem ? `Recorded as written, but ${problem}. Do not file this finding again; apply this to the next ones.` : null;
+    return { content: [{ type: 'text', text: JSON.stringify({ ok: true, recorded: true, ...(note ? { note } : {}) }) }] };
   });
 } else if (which === 'github_comment') {
   server.registerTool('update_claude_comment', {

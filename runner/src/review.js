@@ -268,9 +268,6 @@ async function publishOnce(dir, { log = (s) => process.stderr.write(s + '\n'), f
   return r;
 }
 
-// A finding the tool refused and the engine never re-filed has no known severity; --fail-on counts it.
-const refusedUnfiled = (summary) => (summary?.dropped ?? []).some((d) => d.refused_filing);
-
 export function atOrAbove(findings, failOn) {
   if (!failOn) return 0;
   const rank = (x) => SEVERITIES.indexOf(x);
@@ -293,10 +290,8 @@ export function terminalMarkdown(md, tty) {
 }
 
 // An engine refused a command can give up filing; zero findings then is not a clean bill.
-export function refusalNote(s, dir = null) {
-  let tool = 0;
-  try { tool = readFileSync(path.join(dir ?? '', 'tool-log.jsonl.refused'), 'utf8').split('\n').filter(Boolean).length; } catch { /* none refused */ }
-  const n = (s.permissions?.rejected ?? 0) + tool;
+export function refusalNote(s) {
+  const n = s.permissions?.rejected ?? 0;
   if (!n || (s.findings ?? 0) > 0) return [];
   return [`  note: the engine was refused ${n} command${n === 1 ? '' : 's'} outside Assayer's allowlist and filed nothing; if the summary below describes problems, run the review again or with another engine`];
 }
@@ -348,7 +343,7 @@ function printRound(dir) {
   }
   const lines = [`${s.conclusion}: ${s.findings ?? 0} finding(s) in ${Math.round((s.wall_clock_ms ?? 0) / 1000)}s`];
   lines.push(...findingLines(findings, { tty: Boolean(process.stdout.isTTY) }));
-  lines.push(...refusalNote(s, dir));
+  lines.push(...refusalNote(s));
   const summary = events.findLast((e) => e.type === 'summary');
   if (summary) lines.push('', terminalMarkdown(withoutEngineCredit(summary.body), Boolean(process.stdout.isTTY)));
   process.stdout.write(lines.join('\n') + '\n');
@@ -442,7 +437,7 @@ export async function reviewLocal(o, { log = (s) => process.stderr.write(s + '\n
   const { findings } = readFindings(dir);
   const counts = Object.fromEntries(SEVERITIES.map((x) => [x, findings.filter((f) => severityOf(f.body) === x).length]));
   log(`assayer: ${findings.length} finding(s) (${counts.critical} critical, ${counts.major} major, ${counts.minor} minor), ${snap.dirty ? `working tree on ${localGit(top, ['rev-parse', '--short', 'HEAD'])}` : snap.head.slice(0, 7)} vs ${base.sha.slice(0, 7)} from ${base.source}; round in ${tilde(dir)}`);
-  return { dir, summary, posted: null, blocking: atOrAbove(findings, o.failOn) || (o.failOn !== null && refusedUnfiled(summary)) };
+  return { dir, summary, posted: null, blocking: atOrAbove(findings, o.failOn) };
 }
 
 export async function review(o, { log = (s) => process.stderr.write(s + '\n') } = {}) {
@@ -484,7 +479,7 @@ export async function review(o, { log = (s) => process.stderr.write(s + '\n') } 
   }, { log }));
   printRound(dir);
   if (summary.conclusion !== 'completed') return { dir, summary, posted: null };
-  const blocking = atOrAbove(readFindings(dir).findings, o.failOn) || (o.failOn !== null && refusedUnfiled(summary));
+  const blocking = atOrAbove(readFindings(dir).findings, o.failOn);
   if (!o.post) { log(`assayer: not posted; run \`assayer publish ${path.basename(dir)}\` to post it`); return { dir, summary, posted: null, blocking }; }
   return { dir, summary, posted: await publish(dir, { log, token }), blocking };
 }

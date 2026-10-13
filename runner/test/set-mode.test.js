@@ -35,17 +35,6 @@ it('a subagent that works quietly past the idle clock is not cut off', async () 
   } finally { delete process.env.FAKE_AGENT_MODE; }
 });
 
-it('a refusal is resolved only by a later finding nearby that says the same thing', async () => {
-  const { unresolvedRefusals } = await import('../src/run.js');
-  const { withheldCount } = await import('../src/review.js');
-  const refused = [{ path: 'a.ts', line: 10, at: '2026-10-13T00:00:01Z', body: 'Login accepts forged tokens because the signature is never verified', problem: 'header' }];
-  const refiled = [{ path: 'a.ts', line: 10, at: '2026-10-13T00:00:05Z', body: '_🔒 Security & Privacy_ | _🔴 Critical_ | _⚡ Quick win_\n**Login accepts forged tokens**\nthe signature is never verified' }];
-  const unrelated = [{ path: 'a.ts', line: 11, at: '2026-10-13T00:00:05Z', body: '_📐 Maintainability & Guidelines_ | _🟡 Minor_ | _⚡ Quick win_\n**Rename the helper**\nunclear name' }];
-  const earlier = [{ ...refiled[0], at: '2026-10-13T00:00:00Z' }];
-  assert.equal(unresolvedRefusals(refused, refiled).length, 0);
-  assert.equal(withheldCount({ dropped: unresolvedRefusals(refused, unrelated) }), 1, 'an unrelated nearby Minor does not resolve a refused Critical');
-  assert.equal(unresolvedRefusals(refused, earlier).length, 1, 'a finding filed before the refusal does not resolve it');
-});
 
 it('a pull request cannot rewrite the review rules: changed AGENTS.md and CLAUDE.md keep the base version', async () => {
   const { pinInstructionFiles } = await import('../src/run.js');
@@ -77,4 +66,17 @@ it('an instruction file under a directory the pull request deleted does not abor
   g('rm', '-rq', 'legacy'); writeFileSync(path.join(repo, 'legacy'), 'now a file\n'); writeFileSync(path.join(repo, 'b.ts'), 'z\n');
   g('add', '-A'); g('commit', '-qm', 'head'); const head = g('rev-parse', 'HEAD');
   assert.doesNotThrow(() => pinInstructionFiles(repo, base, head));
+});
+
+it('restoring the base AGENTS.md never deletes a directory the pull request put in its place', async () => {
+  const { pinInstructionFiles } = await import('../src/run.js');
+  const repo = mkdtempSync(path.join(os.tmpdir(), 'assayer-pin3-'));
+  const g = (...a) => execFileSync('git', a, { cwd: repo, encoding: 'utf8' }).trim();
+  g('init', '-q'); g('config', 'user.email', 'a@b'); g('config', 'user.name', 'a');
+  writeFileSync(path.join(repo, 'AGENTS.md'), 'rules\n');
+  g('add', '-A'); g('commit', '-qm', 'base'); const base = g('rev-parse', 'HEAD');
+  g('rm', '-q', 'AGENTS.md'); execFileSync('mkdir', ['-p', path.join(repo, 'AGENTS.md')]); writeFileSync(path.join(repo, 'AGENTS.md', 'app.ts'), 'code\n');
+  g('add', '-A'); g('commit', '-qm', 'head'); const head = g('rev-parse', 'HEAD');
+  pinInstructionFiles(repo, base, head);
+  assert.equal(existsSync(path.join(repo, 'AGENTS.md', 'app.ts')), true);
 });
