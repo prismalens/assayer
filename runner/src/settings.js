@@ -5,6 +5,9 @@ import os from 'node:os';
 import path from 'node:path';
 import { ENGINES } from './engines.js';
 
+// The command as the user ran it: under npx there is no `assayer` on PATH, so a hint naming it fails.
+export const SELF = (process.argv[1] ?? '').includes(`${path.sep}_npx${path.sep}`) ? 'npx @prismalens/assayer' : 'assayer';
+
 export const DEFAULT_ENGINE = 'codex';
 const SEVERITIES = ['critical', 'major', 'minor'];
 export const KEYS = {
@@ -56,7 +59,7 @@ export async function resolveDefaults(o, { settings, isTTY, pick, save, log }) {
     } else if (isTTY && pick) {
       r.engine = await pick();
       save('engine', r.engine);
-      log(`assayer: ${r.engine} is now your default engine; change it with \`assayer config set engine <name>\`, or pass --engine for one round`);
+      log(`assayer: ${r.engine} is now your default engine; change it with \`${SELF} config set engine <name>\`, or pass --engine for one round`);
     } else r.engine = DEFAULT_ENGINE;
   }
   if (r.failOn === null && settings['fail-on']) r.failOn = settings['fail-on'];

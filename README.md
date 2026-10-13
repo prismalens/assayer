@@ -30,6 +30,8 @@ assayer review                             # review your local changes before yo
 assayer config set engine claude-code      # change your default engine
 ```
 
+To try it without installing anything, one command does the same round: `npx @prismalens/assayer review owner/repo#123`. The pre-push hook needs the global install.
+
 From a checkout instead of npm: `cd runner && npm ci && npm link`.
 
 ## What a round looks like

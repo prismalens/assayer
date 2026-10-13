@@ -36,6 +36,22 @@ it('a subagent that works quietly past the idle clock is not cut off', async () 
 });
 
 
+it('an open subagent whose engine stopped writing is cut as stalled; one still writing waits', async () => {
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'assayer-stall-'));
+  const repo = path.join(dir, 'repo');
+  execFileSync('git', ['init', '-q', repo]);
+  writeFileSync(path.join(dir, 'prompt.md'), 'review it');
+  Object.assign(process.env, { FAKE_AGENT_LOG: path.join(dir, 'prompted.log'), FAKE_AGENT_MODE: 'slow-tool', FAKE_AGENT_WAIT: '4000' });
+  const base = { command: process.execPath, args: () => [FAKE], envAllow: ['PATH', 'HOME', 'FAKE_AGENT_LOG', 'FAKE_AGENT_MODE', 'FAKE_AGENT_WAIT'], prepare: ({ env }) => env };
+  const round = (activity, out) => runRound({ engine: 'fake', row: { ...base, activity }, cwd: repo, prompt: path.join(dir, 'prompt.md'), out: path.join(dir, out), engineGh: 'offline', mode: 'review', stage: false, timeoutMs: 30_000, idleMs: 1500 }, { log: () => {} });
+  try {
+    const stalled = await round(() => Date.now() - 60_000, 'stale');
+    assert.equal(stalled.conclusion, 'timed-out');
+    assert.equal(stalled.timed_out_by, 'stalled');
+    assert.equal((await round(() => Date.now(), 'fresh')).conclusion, 'completed');
+  } finally { delete process.env.FAKE_AGENT_MODE; }
+});
+
 it('a pull request cannot rewrite the review rules: changed AGENTS.md and CLAUDE.md keep the base version', async () => {
   const { pinInstructionFiles } = await import('../src/run.js');
   const { readFileSync } = await import('node:fs');

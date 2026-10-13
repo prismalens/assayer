@@ -6,7 +6,7 @@ import { randomUUID } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { assayerHome } from './settings.js';
+import { SELF, assayerHome } from './settings.js';
 
 // The shared PrismaLens EU project; a public, ingest-only key meant to ship in clients.
 const POSTHOG_KEY = 'phc_pCgmw347sL5wFdtsf5eTG4NEki5DyyFwHNXiyUjT5UcW';
@@ -78,7 +78,7 @@ export function forcedOff(env = process.env) {
 const NOTICE = `assayer sends usage counts to help decide what to build next: which engine ran, whether
 the round finished, bucketed finding counts and durations, OS and Node version. Never repository
 names, paths, logins, code or findings. This run sends nothing.
-Turn it off with \`assayer telemetry off\`, ASSAYER_TELEMETRY=off or DO_NOT_TRACK=1.`;
+Turn it off with \`${SELF} telemetry off\`, ASSAYER_TELEMETRY=off or DO_NOT_TRACK=1.`;
 
 export function createTelemetry({
   dir = assayerHome(), env = process.env, fetchImpl = fetch,

@@ -24,7 +24,7 @@ export function git(cwd, args, { env = {}, allowFail = false } = {}) {
 
 export function repoTop(cwd = process.cwd()) {
   const top = git(cwd, ['rev-parse', '--show-toplevel'], { allowFail: true });
-  if (!top) throw refusal('no_repo', 'not inside a git repository; run assayer review from a checkout, or pass owner/repo#N');
+  if (!top) throw refusal('no_repo', 'not inside a git repository; run the review from a checkout, or pass owner/repo#N');
   return top;
 }
 

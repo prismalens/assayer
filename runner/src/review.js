@@ -21,7 +21,7 @@ export { severityOf, withheldCount };
 import { hookCommand, indexRound } from './hook.js';
 import { startProgress } from './progress.js';
 import { LABELS, missingFor, offerSetup, setupHint } from './setup.js';
-import { KEYS, assayerHome, formatSettings, readSettings, resolveDefaults, writeSetting } from './settings.js';
+import { KEYS, SELF, assayerHome, formatSettings, readSettings, resolveDefaults, writeSetting } from './settings.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const USAGE = `usage:
@@ -70,7 +70,7 @@ export function parseArgs(argv) {
     if (target === undefined) return { cmd, action: 'show' };
     if (target === 'set' && rest.length === 2 && rest[0] in KEYS) return { cmd, action: 'set', key: rest[0], value: rest[1] };
     if (target === 'unset' && rest.length === 1 && rest[0] in KEYS) return { cmd, action: 'unset', key: rest[0] };
-    throw new Error(`assayer config [set <key> <value> | unset <key>]; keys: ${Object.keys(KEYS).join(', ')}`);
+    throw new Error(`${SELF} config [set <key> <value> | unset <key>]; keys: ${Object.keys(KEYS).join(', ')}`);
   }
   if (cmd === 'publish') {
     if (!target || rest.length) throw new Error(USAGE);
@@ -228,7 +228,7 @@ export async function publish(dir, opts = {}) {
     return await publishOnce(dir, { ...opts, fetch: retryingFetch(opts.fetch ?? globalThis.fetch) });
   } catch (e) {
     if (e?.message !== 'fetch failed') throw e;
-    throw new Error(`could not reach GitHub (${e.cause?.code ?? e.cause?.message ?? 'network error'}). \`assayer publish ${path.basename(dir)}\` posts the rest; a comment whose reply was lost in the failure may post twice`);
+    throw new Error(`could not reach GitHub (${e.cause?.code ?? e.cause?.message ?? 'network error'}). \`${SELF} publish ${path.basename(dir)}\` posts the rest; a comment whose reply was lost in the failure may post twice`);
   }
 }
 
@@ -313,7 +313,7 @@ export function failureLines(s, dir = null) {
     'rate-limited': 'the engine hit its usage limit; try again after it resets',
     'account-limit': 'the engine account hit its plan limit',
     billing: 'the engine account needs billing set up',
-    'model-unavailable': 'the model is not available to this account; pass --model or `assayer config set model <name>`',
+    'model-unavailable': `the model is not available to this account; pass --model or \`${SELF} config set model <name>\``,
   };
   const out = (s.errors ?? []).map((e) => `  ${e.failure_class}: ${String(e.message).split('\n')[0].slice(0, 200)}${e.reset_at ? ` (resets ${e.reset_at})` : ''}${hint[e.failure_class] ? `\n  -> ${hint[e.failure_class]}` : ''}`);
   if (s.refused_size) {
@@ -323,7 +323,11 @@ export function failureLines(s, dir = null) {
     try { local = JSON.parse(readFileSync(path.join(dir ?? '', 'round.json'), 'utf8')).mode === 'local'; } catch { /* treat as a pull request */ }
     out.push(`  the change is too large for one round${m ? ` (${m[1]} reviewable lines, over ${m[2]})` : ''}; ${local ? 'review it in smaller commits with --head, or push it and review the pull request with --full' : '--full reviews it anyway, in a longer round'}`);
   }
-  if (s.conclusion === 'timed-out') out.push(`  the engine went quiet or ran past its time limit (${s.timed_out_by ?? 'timeout'})`);
+  if (s.conclusion === 'timed-out') {
+    out.push(s.timed_out_by === 'stalled'
+      ? `  a subagent stopped making progress, most likely waiting on the model's provider; run it again, or pick another model with --model`
+      : `  the engine went quiet or ran past its time limit (${s.timed_out_by ?? 'timeout'})`);
+  }
   if (!out.length && s.conclusion !== 'completed' && !s.refused_size) out.push(`  no reason recorded; the engine's own log is ${path.join('<round dir>', 'engine-stderr.log')}`);
   return out;
 }
@@ -363,7 +367,7 @@ async function ensureEngine(engine, interactive) {
   if (!interactive) throw new Error(setupHint(engine, missing));
   const { confirm, isCancel } = await import('@clack/prompts');
   const ok = await offerSetup(engine, { confirm: async (message) => { const a = await confirm({ message }); return !isCancel(a) && a; } });
-  if (!ok) throw new Error(`${LABELS[engine]} is not set up; \`assayer doctor\` lists what is missing`);
+  if (!ok) throw new Error(`${LABELS[engine]} is not set up; \`${SELF} doctor\` lists what is missing`);
 }
 
 // Paths under the home directory print as ~/…, the way people type them.
@@ -476,7 +480,7 @@ export async function review(o, { log = (s) => process.stderr.write(s + '\n') } 
   if (summary.conclusion !== 'completed') return { dir, summary, posted: null };
   // A withheld finding's severity is unknown, so it counts at every level (adversary OBJ-027).
   const blocking = atOrAbove(readFindings(dir).findings, o.failOn) + (o.failOn ? withheldCount(summary) : 0);
-  if (!o.post) { log(`assayer: not posted; run \`assayer publish ${path.basename(dir)}\` to post it`); return { dir, summary, posted: null, blocking }; }
+  if (!o.post) { log(`assayer: not posted; run \`${SELF} publish ${path.basename(dir)}\` to post it`); return { dir, summary, posted: null, blocking }; }
   return { dir, summary, posted: await publish(dir, { log, token }), blocking };
 }
 

@@ -185,9 +185,13 @@ export async function runRound(opts, { log = (s) => process.stderr.write(s + '\n
         setTimeout(() => child.kill('SIGKILL'), 5000).unref();
       };
       timer = setTimeout(() => cancel('wall-clock'), opts.timeoutMs);
+      // An engine that reports its own activity (OpenCode's session store) defers only while it
+      // moves: a subagent waiting on a stalled provider held a round 15 minutes (run-plan 2026-10-13).
       const onIdle = () => {
-        if (open.size) { raw('idle_deferred', { open: open.size }); idle = setTimeout(onIdle, opts.idleMs); return; }
-        cancel('idle');
+        const last = row.activity?.(env) ?? null;
+        const moving = last === null || Date.now() - last < opts.idleMs;
+        if (open.size && moving) { raw('idle_deferred', { open: open.size, activity_at: last && new Date(last).toISOString() }); idle = setTimeout(onIdle, opts.idleMs); return; }
+        cancel(open.size ? 'stalled' : 'idle');
       };
       idle = setTimeout(onIdle, opts.idleMs);
       const init = await ctx.request(acp.methods.agent.initialize, { protocolVersion: acp.PROTOCOL_VERSION, clientCapabilities: {} });

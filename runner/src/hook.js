@@ -4,7 +4,7 @@
 import { appendFileSync, existsSync, readFileSync, readdirSync, rmSync, writeFileSync, chmodSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { git, isZero, severityOf, withheldCount } from './local.js';
-import { assayerHome } from './settings.js';
+import { assayerHome, SELF } from './settings.js';
 
 export const MARKER = '# assayer pre-push hook';
 const SCRIPT = `#!/bin/sh
@@ -19,7 +19,9 @@ function hookPath(cwd) {
   return path.isAbsolute(p) ? p : path.join(git(cwd, ['rev-parse', '--show-toplevel']), p);
 }
 
-export function install(cwd = process.cwd()) {
+export function install(cwd = process.cwd(), self = SELF) {
+  // The hook runs `assayer` from PATH; an npx run leaves nothing there.
+  if (self !== 'assayer') throw new Error('the hook needs assayer on PATH; install it first with `npm i -g @prismalens/assayer`');
   const p = hookPath(cwd);
   if (existsSync(p) && !readFileSync(p, 'utf8').includes(MARKER)) throw new Error(`${p} is another pre-push hook; assayer leaves it alone`);
   mkdirSync(path.dirname(p), { recursive: true });
@@ -90,7 +92,7 @@ export function prePush({ lines, rounds, mode, treeOf, isAncestor }) {
     // clean run does not overrule an earlier finding, and no ordering can hide one (adversary OBJ-032).
     const matching = rounds.filter((r) => r.round.head_tree === tree && (isZero(rsha) || !rsha || isAncestor(r.round.base_sha, rsha)));
     if (!matching.length) {
-      messages.push(`assayer: ${lref} at ${lsha.slice(0, 7)} has no local review. Run: assayer review --head ${lsha.slice(0, 7)}${isZero(rsha) || !rsha ? '' : ` --base ${rsha.slice(0, 7)}`}`);
+      messages.push(`assayer: ${lref} at ${lsha.slice(0, 7)} has no local review. Run: ${SELF} review --head ${lsha.slice(0, 7)}${isZero(rsha) || !rsha ? '' : ` --base ${rsha.slice(0, 7)}`}`);
       block = true;
       continue;
     }

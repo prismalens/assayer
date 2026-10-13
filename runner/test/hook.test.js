@@ -29,6 +29,10 @@ describe('pre-push hook', () => {
     assert.throws(() => uninstall(d), /not assayer's hook/);
   });
 
+  it('refuses to install from an npx run, which leaves nothing on PATH for the hook to call', () => {
+    assert.throws(() => install(repo(), 'npx @prismalens/assayer'), /npm i -g @prismalens\/assayer/);
+  });
+
   it('honours core.hooksPath', () => {
     const d = repo();
     mkdirSync(path.join(d, 'hooks-here'));

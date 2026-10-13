@@ -19,6 +19,8 @@ assayer doctor
 
 `assayer doctor` lists Node, git, python3, gh and its sign-in, and each engine as ready or missing with the command that installs it, and exits non-zero when a round cannot run.
 
+Without installing: `npx @prismalens/assayer review owner/repo#123` runs the same round, and its hints name the `npx` form. The pre-push hook needs the global install.
+
 From a checkout instead: `git clone https://github.com/prismalens/assayer && cd assayer/runner && npm ci && npm link`.
 
 ## Your first round
