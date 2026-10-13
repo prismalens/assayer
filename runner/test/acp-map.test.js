@@ -216,13 +216,20 @@ test('a Codex usage limit said as agent text, then a bare Internal error, is acc
   assert.equal(plain.events.find((e) => e.type === 'error').failure_class, 'api-error');
 });
 
-test('copies of one finding on neighbouring lines merge to the most severe; a finding two lines off stays', async () => {
+test('copies of one finding on neighbouring lines merge to the most severe; distinct defects there stay', async () => {
   const { withheldCount } = await import('../src/review.js');
   const f = (line, sev, t) => ({ tool: 'create_inline_comment', input: { path: 'src/a.ts', line, body: `_🎯 Functional Correctness_ | _${sev}_ | _⚡ Quick win_\n\n**${t}**` } });
   const m = mk();
-  const evs = m.finish({ toolLog: [f(209, '🟠 Major', 'one'), f(210, '🔴 Critical', 'two'), f(211, '🟠 Major', 'three'), f(213, '🟡 Minor', 'four'), f(238, '🟠 Major', 'five'), f(239, '🟠 Major', 'six')] });
-  const kept = evs.filter((e) => e.type === 'finding').map((e) => e.line);
-  assert.deepEqual(kept, [210, 213, 238]);
-  assert.equal(m.dropped.filter((d) => d.merged).length, 3);
+  // Real titles one OpenCode round filed three times for one defect.
+  const evs = m.finish({ toolLog: [
+    f(209, '🟠 Major', 'Cache key missing userId leaks data across users'),
+    f(210, '🔴 Critical', 'Cross-user cache pollution: cache key omits userId'),
+    f(211, '🟠 Major', 'Cross-user cache leak from cache key missing userId'),
+    f(10, '🔴 Critical', 'Missing authorization check on the delete route'),
+    f(11, '🔴 Critical', 'SQL injection through the raw search query'),
+    f(12, '🟠 Major', 'Transaction is never awaited before the response'),
+  ] });
+  assert.deepEqual(evs.filter((e) => e.type === 'finding').map((e) => e.line).sort((a, b) => a - b), [10, 11, 12, 210]);
+  assert.equal(m.dropped.filter((d) => d.merged).length, 2);
   assert.equal(withheldCount({ dropped: m.dropped }), 0, 'merged copies are not reported as withheld');
 });

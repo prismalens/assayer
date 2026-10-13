@@ -170,27 +170,21 @@ export class SessionMapper {
   }
 
   // One defect, one comment (the prompts' own rule): subagents that each file the same finding
-  // leave copies on neighbouring lines. Findings on one file within a line of each other, chained,
-  // keep the most severe, then the first filed; the rest are recorded as merged.
+  // leave copies on neighbouring lines. A finding merges only into one within a line of it whose
+  // title shares enough words; distinct defects on adjacent lines stay (adversary OBJ-019).
   #mergeDuplicates() {
     const rank = (b) => { const m = /_(🔴 Critical|🟠 Major|🟡 Minor)_/u.exec(b ?? ''); return m ? ['🔴 Critical', '🟠 Major', '🟡 Minor'].indexOf(m[1]) : 1; };
-    const found = this.events.map((e, i) => ({ e, i })).filter(({ e }) => e.type === 'finding' && Number.isInteger(e.line));
-    const byPath = new Map();
-    for (const f of found) byPath.set(`${f.e.path}|${f.e.side}`, [...(byPath.get(`${f.e.path}|${f.e.side}`) ?? []), f]);
+    const found = this.events.map((e, i) => ({ e, i, words: titleWords(e.body) })).filter(({ e }) => e.type === 'finding' && Number.isInteger(e.line));
+    const groups = [];
+    for (const f of found) {
+      const g = groups.find((x) => x.key === `${f.e.path}|${f.e.side}` && x.members.some((m) => Math.abs(m.e.line - f.e.line) <= 1 && similar(m.words, f.words)));
+      if (g) g.members.push(f); else groups.push({ key: `${f.e.path}|${f.e.side}`, members: [f] });
+    }
     const drop = new Set();
-    for (const group of byPath.values()) {
-      group.sort((a, b) => a.e.line - b.e.line || a.i - b.i);
-      let cluster = [];
-      const close = () => {
-        if (cluster.length < 2) return;
-        const keep = cluster.reduce((k, f) => (rank(f.e.body) < rank(k.e.body) || (rank(f.e.body) === rank(k.e.body) && f.i < k.i) ? f : k));
-        for (const f of cluster) if (f !== keep) { drop.add(f.i); this.dropped.push({ why: `duplicate of the finding at ${keep.e.path}:${keep.e.line}`, merged: true, line: f.e.line }); }
-      };
-      for (const f of group) {
-        if (cluster.length && f.e.line - cluster.at(-1).e.line > 1) { close(); cluster = []; }
-        cluster.push(f);
-      }
-      close();
+    for (const { members } of groups) {
+      if (members.length < 2) continue;
+      const keep = members.reduce((k, f) => (rank(f.e.body) < rank(k.e.body) || (rank(f.e.body) === rank(k.e.body) && f.i < k.i) ? f : k));
+      for (const f of members) if (f !== keep) { drop.add(f.i); this.dropped.push({ why: `duplicate of the finding at ${keep.e.path}:${keep.e.line}`, merged: true, line: f.e.line }); }
     }
     if (drop.size) this.events = this.events.filter((_, i) => !drop.has(i));
   }
@@ -273,4 +267,17 @@ export function readToolLog(file) {
     try { entries.push(JSON.parse(line)); } catch { corrupt += 1; }
   }
   return { entries, corrupt };
+}
+
+const STOP = new Set(['the', 'and', 'for', 'from', 'with', 'that', 'this', 'are', 'not', 'its', 'into', 'when', 'than', 'then', 'one', 'another', 'other']);
+// Content words of a finding's bold title, lowercased and with a plural s dropped.
+function titleWords(body) {
+  const after = String(body ?? '').slice(String(body ?? '').indexOf('</details>') + 1);
+  const title = /\*\*(.+?)\*\*/.exec(after)?.[1] ?? '';
+  return new Set(title.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 2 && !STOP.has(w)).map((w) => w.replace(/(?<=..)s$/, '')));
+}
+function similar(a, b) {
+  if (!a.size || !b.size) return false;
+  let n = 0; for (const w of a) if (b.has(w)) n += 1;
+  return n / (a.size + b.size - n) >= 0.2;
 }

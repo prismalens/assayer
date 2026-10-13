@@ -235,6 +235,9 @@ export async function runRound(opts, { log = (s) => process.stderr.write(s + '\n
   const tl = readToolLog(toolLog);
   const wallClockMs = Date.now() - started;
   const events = mapper.finish({ toolLog: tl.entries, wallClockMs, conclusion });
+  // A finding the tool refused and the engine never re-filed near the same line is withheld, not
+  // gone: the verdict and the pre-push hook count it (adversary OBJ-021).
+  mapper.dropped.push(...unresolvedRefusals(readRefused(`${toolLog}.refused`), events.filter((e) => e.type === 'finding')));
   writeFileSync(path.join(out, 'events.jsonl'), events.map((e) => JSON.stringify(e)).join('\n') + '\n');
   const summary = {
     engine: opts.engine, model: opts.model, cwd, conclusion: events.at(-1).conclusion, stop_reason: mapper.stopReason,
@@ -254,4 +257,14 @@ if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.me
   try { opts = parseArgs(process.argv.slice(2)); } catch (e) { process.stderr.write(`assayer-run: ${e.message}\n`); process.exit(2); }
   runRound(opts).then((s) => process.exit(s.conclusion === 'completed' ? 0 : s.conclusion === 'timed-out' ? 4 : 3))
     .catch((e) => { process.stderr.write(`assayer-run: ${e.message}\n`); process.exit(2); });
+}
+
+function readRefused(file) {
+  try { return readFileSync(file, 'utf8').split('\n').filter(Boolean).flatMap((l) => { try { return [JSON.parse(l)]; } catch { return []; } }); } catch { return []; }
+}
+
+export function unresolvedRefusals(refused, filed) {
+  return refused
+    .filter((r) => !filed.some((f) => f.path === r.path && (r.line == null || f.line == null || Math.abs(f.line - r.line) <= 3)))
+    .map((r) => ({ why: `refused when filed and never re-filed: ${String(r.problem).slice(0, 160)}`, tool: 'create_inline_comment', refused_filing: true, path: r.path ?? null, line: r.line ?? null }));
 }

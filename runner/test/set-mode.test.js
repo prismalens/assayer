@@ -34,3 +34,12 @@ it('a subagent that works quietly past the idle clock is not cut off', async () 
     assert.equal(s.conclusion, 'completed', 'an open tool call was cut off as idle');
   } finally { delete process.env.FAKE_AGENT_MODE; }
 });
+
+it('a refused finding never re-filed is withheld; one re-filed nearby is not', async () => {
+  const { unresolvedRefusals } = await import('../src/run.js');
+  const { withheldCount } = await import('../src/review.js');
+  const refused = [{ path: 'a.ts', line: 10, problem: 'first line must be exactly …' }, { path: 'b.ts', line: 40, problem: 'bold title' }];
+  const out = unresolvedRefusals(refused, [{ path: 'a.ts', line: 11 }]);
+  assert.deepEqual(out.map((d) => d.path), ['b.ts']);
+  assert.equal(withheldCount({ dropped: out }), 1);
+});
