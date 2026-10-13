@@ -183,6 +183,7 @@ describe('local prompt and CLI', () => {
     const lines = failureLines({ engine: 'codex', conclusion: 'failed', errors: [{ failure_class: 'auth-failed', message: 'Authentication required' }] });
     assert.deepEqual(lines, ['  auth-failed: Authentication required\n  -> sign in to codex once: run `codex login`']);
     assert.match(failureLines({ engine: 'opencode', conclusion: 'timed-out', timed_out_by: 'idle', errors: [] })[0], /went quiet.*idle/);
+    assert.match(failureLines({ engine: 'codex', conclusion: 'failed', errors: [{ failure_class: 'api-unavailable', message: 'Selected model is at capacity.' }] }).join('\n'), /run it again in a few minutes/);
     assert.match(failureLines({ engine: 'codex', conclusion: 'failed', errors: [] })[0], /no reason recorded/);
   });
 

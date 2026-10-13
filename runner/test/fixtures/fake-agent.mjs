@@ -1,5 +1,6 @@
 // A minimal ACP agent for tests. FAKE_AGENT_MODE=slow-tool runs one tool call that stays open
-// for FAKE_AGENT_WAIT ms with no updates; otherwise it refuses session/set_mode. A prompt that
+// for FAKE_AGENT_WAIT ms with no updates; capacity fails the prompt as a busy provider does;
+// otherwise it refuses session/set_mode. A prompt that
 // arrives is recorded in FAKE_AGENT_LOG.
 import { appendFileSync } from 'node:fs';
 import { Readable, Writable } from 'node:stream';
@@ -14,6 +15,7 @@ acp.agent({ name: 'fake' })
   .onRequest(acp.methods.agent.session.setMode, () => { throw new acp.RequestError(-32000, 'mode refused by the fake agent'); })
   .onRequest(acp.methods.agent.session.prompt, async (ctx) => {
     appendFileSync(log, 'prompted\n');
+    if (process.env.FAKE_AGENT_MODE === 'capacity') throw new acp.RequestError(-32603, 'Selected model is at capacity. Please try a different model.');
     if (slow) {
       await update(ctx, { sessionUpdate: 'tool_call', toolCallId: 't1', title: 'task', kind: 'think', status: 'in_progress' });
       await new Promise((r) => setTimeout(r, Number(process.env.FAKE_AGENT_WAIT)));

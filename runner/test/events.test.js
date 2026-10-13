@@ -30,6 +30,7 @@ test('classifyFailure covers the lane vocabulary and falls back to api-error', (
     'prompt is too long: 250000 tokens': 'request-too-large',
     'upstream 503 service unavailable': 'api-unavailable',
     'ECONNRESET': 'api-unavailable',
+    'Selected model is at capacity. Please try a different model.': 'api-unavailable',
     'something odd happened': 'api-error',
   };
   for (const [msg, cls] of Object.entries(cases)) { assert.equal(classifyFailure(msg), cls, msg); assert.ok(FAILURE_CLASSES.includes(cls)); }

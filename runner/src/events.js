@@ -54,7 +54,7 @@ export function classifyFailure(text) {
   if (/billing|payment|insufficient (credit|fund)|credit balance/.test(s)) return 'billing';
   if (/model.*(not found|unavailable|does not exist)|unknown model|404.*model/.test(s)) return 'model-unavailable';
   if (/too large|context length|maximum context|413|prompt is too long/.test(s)) return 'request-too-large';
-  if (/overloaded|503|502|unavailable|timed? ?out|econnreset|enotfound/.test(s)) return 'api-unavailable';
+  if (/overloaded|at capacity|503|502|unavailable|timed? ?out|econnreset|enotfound/.test(s)) return 'api-unavailable';
   return 'api-error';
 }
 

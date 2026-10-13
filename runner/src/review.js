@@ -314,6 +314,7 @@ export function failureLines(s, dir = null) {
     'account-limit': 'the engine account hit its plan limit',
     billing: 'the engine account needs billing set up',
     'model-unavailable': `the model is not available to this account; pass --model or \`${SELF} config set model <name>\``,
+    'api-unavailable': 'the model\'s provider is busy or unreachable; run it again in a few minutes, or pick another model with --model',
   };
   const out = (s.errors ?? []).map((e) => `  ${e.failure_class}: ${String(e.message).split('\n')[0].slice(0, 200)}${e.reset_at ? ` (resets ${e.reset_at})` : ''}${hint[e.failure_class] ? `\n  -> ${hint[e.failure_class]}` : ''}`);
   if (s.refused_size) {

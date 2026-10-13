@@ -50,6 +50,22 @@ it('a subagent quiet until the wall clock is reported as stalled, not cut early'
   } finally { delete process.env.FAKE_AGENT_MODE; }
 });
 
+it('a busy provider fails the round as api-unavailable, with a retry hint', async () => {
+  const { failureLines } = await import('../src/review.js');
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'assayer-capacity-'));
+  const repo = path.join(dir, 'repo');
+  execFileSync('git', ['init', '-q', repo]);
+  writeFileSync(path.join(dir, 'prompt.md'), 'review it');
+  Object.assign(process.env, { FAKE_AGENT_LOG: path.join(dir, 'prompted.log'), FAKE_AGENT_MODE: 'capacity' });
+  const row = { command: process.execPath, args: () => [FAKE], envAllow: ['PATH', 'HOME', 'FAKE_AGENT_LOG', 'FAKE_AGENT_MODE'], prepare: ({ env }) => env };
+  try {
+    const s = await runRound({ engine: 'fake', row, cwd: repo, prompt: path.join(dir, 'prompt.md'), out: path.join(dir, 'out'), engineGh: 'offline', mode: 'review', stage: false, timeoutMs: 20_000, idleMs: 10_000 }, { log: () => {} });
+    assert.equal(s.conclusion, 'failed');
+    assert.equal(s.errors[0].failure_class, 'api-unavailable');
+    assert.match(failureLines(s).join('\n'), /run it again in a few minutes/);
+  } finally { delete process.env.FAKE_AGENT_MODE; }
+});
+
 it('a pull request cannot rewrite the review rules: changed AGENTS.md and CLAUDE.md keep the base version', async () => {
   const { pinInstructionFiles } = await import('../src/run.js');
   const { readFileSync } = await import('node:fs');
