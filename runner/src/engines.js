@@ -1,6 +1,8 @@
 // The engine registry: what to spawn and how it takes its model and credential. Every row is
 // an ACP agent on stdio. A row enters only after an admission run passes; `admitted` records it.
+import { spawnSync } from 'node:child_process';
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { parse as parseToml, stringify as stringifyToml } from 'smol-toml';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -14,22 +16,35 @@ export const CODEX_DENY = Object.freeze(Object.fromEntries([
   '~/.git-credentials', '~/.config/git/credentials', '~/.gnupg', '~/.claude/.credentials.json', '~/.local/share/opencode/auth.json',
 ].map((p) => [p, 'deny'])));
 
+// The user's Codex config, read with a TOML parser: quoted keys, inline tables and comments are all
+// valid there, and a regex missed them (adversary OBJ-012, OBJ-018).
+function codexConfig(env) {
+  const file = path.join(env.CODEX_HOME || path.join(os.homedir(), '.codex'), 'config.toml');
+  try { return { file, toml: parseToml(readFileSync(file, 'utf8')) }; } catch { return { file, toml: null }; }
+}
+const profilesOf = (toml) => Object.values(toml?.profiles && typeof toml.profiles === 'object' ? toml.profiles : {});
+
 // Codex ignores a permission profile when any loaded config sets sandbox_mode (its permissions
 // docs), and the deny list above goes with it. Assayer leaves the user's CODEX_HOME in place.
 export function codexSandboxModeSet(env = process.env) {
-  const file = path.join(env.CODEX_HOME || path.join(os.homedir(), '.codex'), 'config.toml');
-  try { return /^\s*sandbox_mode\s*=/m.test(readFileSync(file, 'utf8')) ? file : null; } catch { return null; }
+  const { file, toml } = codexConfig(env);
+  if (!toml) return null;
+  return toml.sandbox_mode !== undefined || profilesOf(toml).some((p) => p?.sandbox_mode !== undefined) ? file : null;
 }
 
-// The user's own MCP servers: a real round's Codex called the user's Notion tools unasked.
-export function codexUserMcpServers(env = process.env) {
-  const file = path.join(env.CODEX_HOME || path.join(os.homedir(), '.codex'), 'config.toml');
-  let text = '';
-  try { text = readFileSync(file, 'utf8'); } catch { return []; }
-  const names = new Set();
-  for (const m of text.matchAll(/^\s*\[mcp_servers\.("?)([^"\].]+)\1(?:\.[^\]]+)?\]\s*$/gm)) names.add(m[2]);
-  for (const m of text.matchAll(/^\s*mcp_servers\.("?)([^"=.\s]+)\1\./gm)) names.add(m[2]);
+// The user's own MCP servers: a real round's Codex called the user's Notion tools unasked. Codex's
+// own inventory and the parsed config, top level and every profile, unioned.
+export function codexUserMcpServers(env = process.env, list = codexMcpList) {
+  const { toml } = codexConfig(env);
+  const names = new Set([toml?.mcp_servers, ...profilesOf(toml).map((p) => p?.mcp_servers)]
+    .filter((t) => t && typeof t === 'object').flatMap((t) => Object.keys(t)));
+  for (const n of list(env)) names.add(n);
   return [...names];
+}
+
+function codexMcpList(env) {
+  const r = spawnSync('codex', ['mcp', 'list', '--json'], { env: { ...process.env, ...env }, encoding: 'utf8', timeout: 15_000 });
+  try { return r.status === 0 ? JSON.parse(r.stdout).map((s) => s.name).filter((n) => typeof n === 'string') : []; } catch { return []; }
 }
 
 // Codex loads a trusted project's .codex/config.toml, and codex-acp trusts the checkout, so a pull
@@ -39,9 +54,9 @@ export function codexUserMcpServers(env = process.env) {
 export function sealCodexCheckout(cwd, env = process.env) {
   rmSync(path.join(cwd, '.codex'), { recursive: true, force: true });
   rmSync(path.join(cwd, '.agents'), { recursive: true, force: true });
-  const servers = codexUserMcpServers(env).filter((n) => /^[\w-]+$/.test(n));
+  const servers = codexUserMcpServers(env);
   mkdirSync(path.join(cwd, '.codex'), { recursive: true });
-  writeFileSync(path.join(cwd, '.codex', 'config.toml'), servers.map((n) => `[mcp_servers.${n}]\nenabled = false\n`).join('\n'));
+  writeFileSync(path.join(cwd, '.codex', 'config.toml'), stringifyToml({ mcp_servers: Object.fromEntries(servers.map((n) => [n, { enabled: false }])) }));
   return servers;
 }
 
