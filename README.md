@@ -4,7 +4,7 @@
 </picture>
 
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
-![Node 24+](https://img.shields.io/badge/node-%E2%89%A524-339933)
+![Node 22+](https://img.shields.io/badge/node-%E2%89%A522-339933)
 ![Status: alpha](https://img.shields.io/badge/status-alpha-d9a441)
 
 Assayer is open source code review that runs on your machine with your own Codex, Claude Code or OpenCode sign-in. It reviews a pull request, posts its findings inline under your own GitHub login, and can review what you are about to push before you push it. There is no hosted service and no extra API key.
@@ -15,7 +15,7 @@ Assayer is open source code review that runs on your machine with your own Codex
 
 ## Quick start
 
-You need Linux or macOS (on Windows, use WSL), Node 24 or newer, `git`, `python3` and the [GitHub CLI](https://cli.github.com) signed in (`gh auth login`).
+You need Linux or macOS (on Windows, use WSL), Node 22 or newer, `git`, `python3` and the [GitHub CLI](https://cli.github.com) signed in (`gh auth login`).
 
 ```bash
 npm i -g @prismalens/assayer

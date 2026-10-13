@@ -7,7 +7,7 @@ import path from 'node:path';
 import { ENGINES, codexSandboxModeSet, installArgs } from './engines.js';
 import { SELF } from './settings.js';
 
-const MIN_NODE = 24;
+const MIN_NODE = 22; // the oldest Node release still supported upstream; CI runs 22 and 24
 
 export function onPath(cmd, env = process.env) {
   const exts = process.platform === 'win32' ? (env.PATHEXT ?? '.EXE;.CMD').split(';') : [''];

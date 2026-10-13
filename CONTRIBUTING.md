@@ -28,7 +28,7 @@ remain closed. Nothing is required of you until then.
 
 ## Development setup
 
-Requirements: **Node 24** and **npm**.
+Requirements: **Node 22 or newer** and **npm**.
 
 ```bash
 git clone https://github.com/prismalens/assayer.git
@@ -58,7 +58,7 @@ Run the test suite:
 
 ## Code style
 
-- Plain JavaScript on Node 24.
+- Plain JavaScript on Node 22 and newer; CI tests 22 and 24.
 - Preserve existing formatting and indentation.
 - Small, cohesive modules with explicit error handling and no committed credentials.
 

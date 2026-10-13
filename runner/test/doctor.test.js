@@ -25,7 +25,8 @@ describe('doctor', () => {
   it('is not ready without an adapter, without gh sign-in, or on an old Node', () => {
     assert.equal(doctor(machine(['git', 'python3', 'gh', 'codex'])).ok, false);
     assert.equal(doctor(machine(['git', 'python3', 'gh', 'opencode'], { signedIn: false })).ok, false);
-    assert.equal(doctor({ ...machine(['git', 'python3', 'gh', 'opencode']), nodeVersion: '22.11.0' }).ok, false);
+    assert.equal(doctor({ ...machine(['git', 'python3', 'gh', 'opencode']), nodeVersion: '20.19.0' }).ok, false);
+    assert.equal(doctor({ ...machine(['git', 'python3', 'gh', 'opencode']), nodeVersion: '22.11.0' }).ok, true);
   });
 
   it('notes a version other than the admitted one, and never blocks on it', () => {
