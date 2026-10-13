@@ -52,6 +52,13 @@ describe('pre-push hook', () => {
     assert.match(run(line, [round([finding('🟠 Major')])], 'block').messages.at(-1), /--no-verify/);
   });
 
+  it('blocks on a withheld finding, whose severity is unknown (OBJ-027)', () => {
+    const line = [`refs/heads/x ${A} refs/heads/x ${R}`];
+    const r = run(line, [{ ...round([]), withheld: 1 }], 'block');
+    assert.equal(r.code, 1);
+    assert.match(r.messages.join('\n'), /withheld 1 finding/);
+  });
+
   it('treats a round whose base is not behind the remote as no review, and skips deletes', () => {
     const line = [`refs/heads/x ${A} refs/heads/x ${R}`];
     const r = run(line, [round([])], 'block', false);

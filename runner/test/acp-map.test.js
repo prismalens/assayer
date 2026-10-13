@@ -256,5 +256,8 @@ test('same title, different body or severity: both stay, so a Critical never hid
   ] });
   const found = evs.filter((e) => e.type === 'finding');
   assert.equal(found.length, 6);
+  // Bodies equal only after whitespace folding stay apart: one reads Critical, one unreadable.
+  const w = mk().finish({ toolLog: [f('🔴 Critical', 'Same', 'x'), { tool: 'create_inline_comment', input: { path: 'src/a.ts', line: 30, body: '\n' + f('🔴 Critical', 'Same', 'x').input.body } }] });
+  assert.equal(w.filter((e) => e.type === 'finding').length, 2);
   assert.equal(atOrAbove(found, 'critical'), 2);
 });

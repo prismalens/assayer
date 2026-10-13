@@ -7,7 +7,7 @@ import path from 'node:path';
 import { snapshot, chooseBase, localCheckout, changedFiles, sameTree } from '../src/local.js';
 import { buildManifest } from '../src/manifest.js';
 import { renderCodexPrompt } from '../src/prompt.js';
-import { parseArgs, severityOf, atOrAbove, publish, findingLines, failureLines } from '../src/review.js';
+import { parseArgs, severityOf, atOrAbove, publish, findingLines, failureLines, withheldCount } from '../src/review.js';
 import { sanitize } from '../src/telemetry.js';
 
 const tmp = () => mkdtempSync(path.join(os.tmpdir(), 'assayer-local-'));
@@ -146,12 +146,18 @@ describe('local prompt and CLI', () => {
     assert.equal(parseArgs(['review', 'acme/w#3']).local, undefined);
   });
 
-  it('maps severities onto --fail-on, counting an unreadable one as major', () => {
+  it('maps severities onto --fail-on, counting an unreadable or withheld one at every level', () => {
     const f = (sev) => ({ body: `_🎯 Functional Correctness_ | _${sev}_ | _⚡ Quick win_\nbody` });
     assert.equal(severityOf('no header').toString(), 'major');
     assert.equal(severityOf('_bug_ | _critical_ | _x_'), 'critical', 'any case (OBJ-026)');
     assert.equal(atOrAbove([{ body: 'no header at all' }], 'critical'), 1, 'unreadable counts at every threshold');
     assert.equal(atOrAbove([{ body: '_bug_ | _critical_ | _x_' }], 'critical'), 1);
+    // Only the middle field counts: a category naming a severity word does not (OBJ-026).
+    assert.equal(severityOf('_Minor UI glitch_ | _🔴 Critical_ | _⚡ Quick win_'), 'critical');
+    assert.equal(severityOf('_Critical path_ | _🟡 Minor_ | _x_'), 'minor');
+    assert.equal(atOrAbove([{ body: '_minor issue_ crashes on critical path' }], 'critical'), 1, 'no header shape: unreadable');
+    assert.equal(atOrAbove([{ body: '\n_bug_ | _🟡 Minor_ | _x_' }], 'critical'), 1);
+    assert.equal(withheldCount({ dropped: [{ why: 'recorder redacted this record: credential-shaped body', tool: 'create_inline_comment' }] }), 1);
     const findings = [f('🔴 Critical'), f('🟠 Major'), f('🟡 Minor')];
     assert.deepEqual(['critical', 'major', 'minor', null].map((x) => atOrAbove(findings, x)), [1, 2, 3, 0]);
   });

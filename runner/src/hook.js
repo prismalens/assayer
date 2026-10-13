@@ -3,7 +3,7 @@
 // for the tree being pushed. It warns by default, blocks only when asked, and fails open.
 import { existsSync, readFileSync, readdirSync, rmSync, writeFileSync, chmodSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
-import { git, isZero, severityOf } from './local.js';
+import { git, isZero, severityOf, withheldCount } from './local.js';
 import { assayerHome } from './settings.js';
 
 export const MARKER = '# assayer pre-push hook';
@@ -52,7 +52,7 @@ export function localRounds(root = path.join(assayerHome(), 'reviews')) {
       const summary = JSON.parse(readFileSync(path.join(dir, 'summary.json'), 'utf8'));
       if (round.mode !== 'local' || summary.conclusion !== 'completed') continue;
       const findings = readFileSync(path.join(dir, 'events.jsonl'), 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)).filter((e) => e.type === 'finding');
-      out.push({ dir, round, findings, mtime: Number(name.match(/-(\d+)$/)?.[1] ?? 0) });
+      out.push({ dir, round, findings, withheld: withheldCount(summary), mtime: Number(name.match(/-(\d+)$/)?.[1] ?? 0) });
     } catch { /* an unfinished or foreign directory */ }
   }
   return out.sort((a, b) => b.mtime - a.mtime);
@@ -76,8 +76,10 @@ export function prePush({ lines, rounds, mode, treeOf, isAncestor }) {
       continue;
     }
     const serious = round.findings.filter((f) => atLeastMajor(f.body));
-    if (!serious.length) { messages.push(`assayer: ${lref} reviewed, nothing major (${round.dir})`); continue; }
-    messages.push(`assayer: ${lref} has ${serious.length} major or critical finding(s) from round ${path.basename(round.dir)}:`);
+    // A withheld finding's severity is unknown, so it blocks like a major one (adversary OBJ-027).
+    if (round.withheld) messages.push(`assayer: ${lref}: round ${path.basename(round.dir)} withheld ${round.withheld} finding(s) Assayer could not read; see ${round.dir}`);
+    if (!serious.length && !round.withheld) { messages.push(`assayer: ${lref} reviewed, nothing major (${round.dir})`); continue; }
+    if (serious.length) messages.push(`assayer: ${lref} has ${serious.length} major or critical finding(s) from round ${path.basename(round.dir)}:`);
     for (const f of serious) {
       const after = f.body.slice(f.body.indexOf('</details>') + 1);
       const title = (/\*\*(.+?)\*\*/.exec(after)?.[1] ?? '').replace(/[\x00-\x1f]/g, ' ').slice(0, 100);

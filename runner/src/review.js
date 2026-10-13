@@ -15,9 +15,9 @@ import { renderPrompt, renderCodexPrompt, promptHash, laneTokens, forFileTools }
 import { checkout } from './github.js';
 import { runRound } from './run.js';
 import { LIVENESS_PREFIX, postRound, withoutEngineCredit } from './poster.js';
-import { changedFiles, chooseBase, localCheckout, refusal as localRefusal, repoTop, sameTree, severityOf, snapshot, git as localGit } from './local.js';
+import { changedFiles, chooseBase, localCheckout, refusal as localRefusal, repoTop, sameTree, severityOf, snapshot, withheldCount, git as localGit } from './local.js';
 
-export { severityOf };
+export { severityOf, withheldCount };
 import { hookCommand } from './hook.js';
 import { startProgress } from './progress.js';
 import { LABELS, missingFor, offerSetup, setupHint } from './setup.js';
@@ -203,12 +203,6 @@ export function fileJournal(dir) {
   return { has: (k) => seen.has(k), record: (k, id) => { seen.set(k, id); appendFileSync(file, JSON.stringify({ key: k, id, at: new Date().toISOString() }) + '\n'); } };
 }
 
-// Findings the runner lost before they became events. A corrupt tool-log line may have been
-// one, so it counts as withheld rather than letting the verdict say "no findings" (OBJ-005).
-export function withheldCount(summary) {
-  const dropped = (summary.dropped ?? []).filter((d) => !d.merged && (d.tool === 'create_inline_comment' || /finding/i.test(d.why ?? ''))).length;
-  return dropped + (summary.tool_log_corrupt_lines ?? 0);
-}
 
 // GitHub through a flaky network: a read is retried on any network error or a 502/503/504; a
 // write only when the connection never opened, since a write that reached GitHub must not repeat.
@@ -437,7 +431,7 @@ export async function reviewLocal(o, { log = (s) => process.stderr.write(s + '\n
   const { findings } = readFindings(dir);
   const counts = Object.fromEntries(SEVERITIES.map((x) => [x, findings.filter((f) => severityOf(f.body) === x).length]));
   log(`assayer: ${findings.length} finding(s) (${counts.critical} critical, ${counts.major} major, ${counts.minor} minor), ${snap.dirty ? `working tree on ${localGit(top, ['rev-parse', '--short', 'HEAD'])}` : snap.head.slice(0, 7)} vs ${base.sha.slice(0, 7)} from ${base.source}; round in ${tilde(dir)}`);
-  return { dir, summary, posted: null, blocking: atOrAbove(findings, o.failOn) };
+  return { dir, summary, posted: null, blocking: atOrAbove(findings, o.failOn) + (o.failOn ? withheldCount(summary) : 0) };
 }
 
 export async function review(o, { log = (s) => process.stderr.write(s + '\n') } = {}) {
@@ -479,7 +473,8 @@ export async function review(o, { log = (s) => process.stderr.write(s + '\n') } 
   }, { log }));
   printRound(dir);
   if (summary.conclusion !== 'completed') return { dir, summary, posted: null };
-  const blocking = atOrAbove(readFindings(dir).findings, o.failOn);
+  // A withheld finding's severity is unknown, so it counts at every level (adversary OBJ-027).
+  const blocking = atOrAbove(readFindings(dir).findings, o.failOn) + (o.failOn ? withheldCount(summary) : 0);
   if (!o.post) { log(`assayer: not posted; run \`assayer publish ${path.basename(dir)}\` to post it`); return { dir, summary, posted: null, blocking }; }
   return { dir, summary, posted: await publish(dir, { log, token }), blocking };
 }

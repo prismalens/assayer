@@ -169,16 +169,14 @@ export class SessionMapper {
     }
   }
 
-  // A finding filed twice, identically (same file, side, range and body), posts once. Nothing
-  // looser merges: every similarity rule tried also merged distinct defects (adversary OBJ-019).
+  // A finding filed twice, byte for byte (same file, side, range and body), posts once. Nothing
+  // looser merges: every normalisation tried also merged distinct filings (adversary OBJ-019).
   #mergeDuplicates() {
     const seen = new Map();
     const drop = new Set();
     this.events.forEach((e, i) => {
       if (e.type !== 'finding' || !Number.isInteger(e.line)) return;
-      const body = String(e.body ?? '').replace(/\s+/g, ' ').trim();
-      if (!body) return;
-      const key = JSON.stringify([e.path, e.side, e._meta?.start_line ?? null, e.line, body]);
+      const key = JSON.stringify([e.path, e.side, e._meta?.start_line ?? null, e.line, e.body]);
       if (seen.has(key)) { drop.add(i); this.dropped.push({ why: `identical to the finding at ${e.path}:${e.line}`, merged: true, line: e.line }); } else seen.set(key, i);
     });
     if (drop.size) this.events = this.events.filter((_, i) => !drop.has(i));
