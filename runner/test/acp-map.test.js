@@ -229,7 +229,14 @@ test('copies of one finding on neighbouring lines merge to the most severe; dist
     f(11, '🔴 Critical', 'SQL injection through the raw search query'),
     f(12, '🟠 Major', 'Transaction is never awaited before the response'),
   ] });
-  assert.deepEqual(evs.filter((e) => e.type === 'finding').map((e) => e.line).sort((a, b) => a - b), [10, 11, 12, 210]);
-  assert.equal(m.dropped.filter((d) => d.merged).length, 2);
+  assert.deepEqual(evs.filter((e) => e.type === 'finding').map((e) => e.line).sort((a, b) => a - b), [10, 11, 12, 209, 210, 211], 'differently worded copies stay; a lost defect costs more');
+  assert.equal(m.dropped.filter((d) => d.merged).length, 0);
   assert.equal(withheldCount({ dropped: m.dropped }), 0, 'merged copies are not reported as withheld');
+});
+
+test('a re-filed copy with nearly the same title merges; forged tokens and plaintext tokens stay apart', () => {
+  const f = (line, sev, t) => ({ tool: 'create_inline_comment', input: { path: 'src/a.ts', line, body: `_🔒 Security & Privacy_ | _${sev}_ | _⚡ Quick win_\n\n**${t}**` } });
+  const m = mk();
+  const evs = m.finish({ toolLog: [f(10, '🔴 Critical', 'Login accepts forged tokens'), f(11, '🟠 Major', 'Login logs plaintext tokens'), f(20, '🟠 Major', 'Cache key omits userId'), f(21, '🔴 Critical', 'Cache key omits the userId')] });
+  assert.deepEqual(evs.filter((e) => e.type === 'finding').map((e) => e.line), [10, 11, 21]);
 });

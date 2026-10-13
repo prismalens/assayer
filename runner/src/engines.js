@@ -18,10 +18,11 @@ export const CODEX_DENY = Object.freeze(Object.fromEntries([
 
 // The user's Codex config, read with a TOML parser: quoted keys, inline tables and comments are all
 // valid there, and a regex missed them (adversary OBJ-012, OBJ-018).
-function codexConfig(env) {
-  const file = path.join(env.CODEX_HOME || path.join(os.homedir(), '.codex'), 'config.toml');
+function codexConfig(env, file = path.join(env.CODEX_HOME || path.join(os.homedir(), '.codex'), 'config.toml')) {
   try { return { file, toml: parseToml(readFileSync(file, 'utf8')) }; } catch { return { file, toml: null }; }
 }
+// Codex's system layer (its config docs) also declares servers.
+const SYSTEM_CONFIG = '/etc/codex/config.toml';
 const profilesOf = (toml) => Object.values(toml?.profiles && typeof toml.profiles === 'object' ? toml.profiles : {});
 
 // Codex ignores a permission profile when any loaded config sets sandbox_mode (its permissions
@@ -34,27 +35,33 @@ export function codexSandboxModeSet(env = process.env) {
 
 // The user's own MCP servers: a real round's Codex called the user's Notion tools unasked. Codex's
 // own inventory and the parsed config, top level and every profile, unioned.
-export function codexUserMcpServers(env = process.env, list = codexMcpList) {
-  const { toml } = codexConfig(env);
-  const names = new Set([toml?.mcp_servers, ...profilesOf(toml).map((p) => p?.mcp_servers)]
-    .filter((t) => t && typeof t === 'object').flatMap((t) => Object.keys(t)));
+export function codexUserMcpServers(env = process.env, list = codexMcpList, systemFile = SYSTEM_CONFIG) {
+  const tables = [codexConfig(env).toml, codexConfig(env, systemFile).toml].flatMap((t) => [t?.mcp_servers, ...profilesOf(t).map((p) => p?.mcp_servers)]);
+  const names = new Set(tables.filter((t) => t && typeof t === 'object').flatMap((t) => Object.keys(t)));
   for (const n of list(env)) names.add(n);
   return [...names];
 }
 
+// Codex's own inventory. A failure is not an empty list: the round refuses to start rather than
+// run with servers it could not see (adversary OBJ-024).
 function codexMcpList(env) {
   const r = spawnSync('codex', ['mcp', 'list', '--json'], { env: { ...process.env, ...env }, encoding: 'utf8', timeout: 15_000 });
-  try { return r.status === 0 ? JSON.parse(r.stdout).map((s) => s.name).filter((n) => typeof n === 'string') : []; } catch { return []; }
+  let names = null;
+  try { names = r.status === 0 ? JSON.parse(r.stdout).map((s) => s.name) : null; } catch { names = null; }
+  if (!Array.isArray(names) || names.some((n) => typeof n !== 'string')) {
+    throw Object.assign(new Error('could not list Codex\'s MCP servers (`codex mcp list --json` failed), so a round cannot switch them off; fix codex or use another engine'), { stage: 'engine-setup' });
+  }
+  return names;
 }
 
 // Codex loads a trusted project's .codex/config.toml, and codex-acp trusts the checkout, so a pull
 // request could configure the engine reviewing it. The checkout's .codex/ and .agents/ (skills) are
 // replaced before the engine starts; the review still sees them in the staged diff. The written
 // config switches off the user's own MCP servers, which no thread-level override reached.
-export function sealCodexCheckout(cwd, env = process.env) {
+export function sealCodexCheckout(cwd, env = process.env, list = codexMcpList) {
   rmSync(path.join(cwd, '.codex'), { recursive: true, force: true });
   rmSync(path.join(cwd, '.agents'), { recursive: true, force: true });
-  const servers = codexUserMcpServers(env);
+  const servers = codexUserMcpServers(env, list);
   mkdirSync(path.join(cwd, '.codex'), { recursive: true });
   writeFileSync(path.join(cwd, '.codex', 'config.toml'), stringifyToml({ mcp_servers: Object.fromEntries(servers.map((n) => [n, { enabled: false }])) }));
   return servers;

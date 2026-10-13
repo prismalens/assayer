@@ -238,7 +238,9 @@ export async function runRound(opts, { log = (s) => process.stderr.write(s + '\n
   const events = mapper.finish({ toolLog: tl.entries, wallClockMs, conclusion });
   // A finding the tool refused and the engine never re-filed near the same line is withheld, not
   // gone: the verdict and the pre-push hook count it (adversary OBJ-021).
-  mapper.dropped.push(...unresolvedRefusals(readRefused(`${toolLog}.refused`), events.filter((e) => e.type === 'finding')));
+  const accepted = tl.entries.filter((e) => e.tool === 'create_inline_comment' && typeof e.input?.path === 'string')
+    .map((e) => ({ path: path.relative(cwd, path.resolve(cwd, e.input.path)), line: e.input.line ?? null, body: e.input.body, at: e.at }));
+  mapper.dropped.push(...unresolvedRefusals(readRefused(`${toolLog}.refused`).map((r) => ({ ...r, path: typeof r.path === 'string' ? path.relative(cwd, path.resolve(cwd, r.path)) : r.path })), accepted));
   writeFileSync(path.join(out, 'events.jsonl'), events.map((e) => JSON.stringify(e)).join('\n') + '\n');
   const summary = {
     engine: opts.engine, model: opts.model, cwd, conclusion: events.at(-1).conclusion, stop_reason: mapper.stopReason,
@@ -264,9 +266,14 @@ function readRefused(file) {
   try { return readFileSync(file, 'utf8').split('\n').filter(Boolean).flatMap((l) => { try { return [JSON.parse(l)]; } catch { return []; } }); } catch { return []; }
 }
 
+// Resolved only by a finding filed after the refusal, near it, that says the same thing: an
+// unrelated nearby finding does not stand in for it (adversary OBJ-021).
 export function unresolvedRefusals(refused, filed) {
+  const words = (t) => new Set(String(t ?? '').toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 2));
+  const same = (a, b) => { const x = words(a); const y = words(b); let n = 0; for (const w of x) if (y.has(w)) n += 1; return x.size && y.size ? n / (x.size + y.size - n) >= 0.3 : false; };
   return refused
-    .filter((r) => !filed.some((f) => f.path === r.path && (r.line == null || f.line == null || Math.abs(f.line - r.line) <= 3)))
+    .filter((r) => !filed.some((f) => f.path === r.path && (!r.at || !f.at || f.at >= r.at)
+      && (r.line == null || f.line == null || Math.abs(f.line - r.line) <= 3) && same(r.body, f.body)))
     .map((r) => ({ why: `refused when filed and never re-filed: ${String(r.problem).slice(0, 160)}`, tool: 'create_inline_comment', refused_filing: true, path: r.path ?? null, line: r.line ?? null }));
 }
 
@@ -280,7 +287,12 @@ export function pinInstructionFiles(cwd, baseSha, headSha) {
     const file = path.join(cwd, rel);
     let base = null;
     try { base = execFileSync('git', ['show', `${baseSha}:${rel}`], { cwd, stdio: ['ignore', 'pipe', 'ignore'] }); } catch { /* added by the pull request */ }
-    if (base === null) rmSync(file, { force: true }); else writeFileSync(file, base);
+    // A file under a directory the pull request deleted or replaced is restored where it can be,
+    // and otherwise left out: an instruction file is never a reason to abort the round (OBJ-023).
+    try {
+      if (base === null) rmSync(file, { force: true, recursive: true });
+      else { mkdirSync(path.dirname(file), { recursive: true }); rmSync(file, { force: true, recursive: true }); writeFileSync(file, base); }
+    } catch { try { rmSync(file, { force: true, recursive: true }); } catch { /* the path is not ours to clear */ } }
   }
   return changed;
 }

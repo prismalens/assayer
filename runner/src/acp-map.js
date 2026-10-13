@@ -169,9 +169,9 @@ export class SessionMapper {
     }
   }
 
-  // One defect, one comment (the prompts' own rule): subagents that each file the same finding
-  // leave copies on neighbouring lines. A finding merges only into one within a line of it whose
-  // title shares enough words; distinct defects on adjacent lines stay (adversary OBJ-019).
+  // An engine that re-files a finding leaves a copy on the same or next line with nearly the same
+  // title; only those merge. Distinct defects sharing vocabulary stay, so differently worded
+  // copies may post: a lost defect costs more than a repeated one (adversary OBJ-019).
   #mergeDuplicates() {
     const rank = (b) => { const m = /_(🔴 Critical|🟠 Major|🟡 Minor)_/u.exec(b ?? ''); return m ? ['🔴 Critical', '🟠 Major', '🟡 Minor'].indexOf(m[1]) : 1; };
     const found = this.events.map((e, i) => ({ e, i, words: titleWords(e.body) })).filter(({ e }) => e.type === 'finding' && Number.isInteger(e.line));
@@ -279,5 +279,5 @@ function titleWords(body) {
 function similar(a, b) {
   if (!a.size || !b.size) return false;
   let n = 0; for (const w of a) if (b.has(w)) n += 1;
-  return n / (a.size + b.size - n) >= 0.2;
+  return n / (a.size + b.size - n) >= 0.6;
 }

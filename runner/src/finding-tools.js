@@ -55,7 +55,8 @@ if (which === 'github_inline_comment') {
     // diff line instead of leaving a stray copy. No diff to check against: recorded as before.
     const problem = formatProblem(input.body) ?? (diff && anchorProblem(diff, input, process.env.ASSAYER_CHECKOUT || null));
     if (problem) {
-      appendFileSync(`${log}.refused`, JSON.stringify({ at: new Date().toISOString(), path: input.path, line: input.line ?? null, problem }) + '\n');
+      const body = typeof input.body === 'string' && !looksLikeSecret(input.body) ? input.body.slice(0, 600) : null;
+      appendFileSync(`${log}.refused`, JSON.stringify({ at: new Date().toISOString(), path: input.path, line: input.line ?? null, body, problem }) + '\n');
       return { isError: true, content: [{ type: 'text', text: `Not recorded: ${problem}.` }] };
     }
     record('create_inline_comment', input);
