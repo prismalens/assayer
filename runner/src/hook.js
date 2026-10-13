@@ -1,7 +1,7 @@
 // `assayer hook`: an opt-in pre-push hook that never starts a round. A round takes minutes, and
 // a hook that slow gets bypassed, so the hook only reads what `assayer review` already found
 // for the tree being pushed. It warns by default, blocks only when asked, and fails open.
-import { existsSync, readFileSync, readdirSync, rmSync, writeFileSync, chmodSync, mkdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync, chmodSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { git, isZero, severityOf, withheldCount } from './local.js';
 import { assayerHome } from './settings.js';
@@ -52,7 +52,8 @@ export function localRounds(root = path.join(assayerHome(), 'reviews')) {
       const summary = JSON.parse(readFileSync(path.join(dir, 'summary.json'), 'utf8'));
       if (round.mode !== 'local' || summary.conclusion !== 'completed') continue;
       const findings = readFileSync(path.join(dir, 'events.jsonl'), 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)).filter((e) => e.type === 'finding');
-      out.push({ dir, round, findings, withheld: withheldCount(summary), mtime: Number(name.match(/-(\d+)$/)?.[1] ?? 0) });
+      // Ordered by when the round finished, not its name: an --out name has no timestamp (adversary OBJ-028).
+      out.push({ dir, round, findings, withheld: withheldCount(summary), mtime: statSync(path.join(dir, 'summary.json')).mtimeMs });
     } catch { /* an unfinished or foreign directory */ }
   }
   return out.sort((a, b) => b.mtime - a.mtime);

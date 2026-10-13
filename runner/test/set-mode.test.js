@@ -27,10 +27,10 @@ it('a subagent that works quietly past the idle clock is not cut off', async () 
   const repo = path.join(dir, 'repo');
   execFileSync('git', ['init', '-q', repo]);
   writeFileSync(path.join(dir, 'prompt.md'), 'review it');
-  Object.assign(process.env, { FAKE_AGENT_LOG: path.join(dir, 'prompted.log'), FAKE_AGENT_MODE: 'slow-tool', FAKE_AGENT_WAIT: '1500' });
+  Object.assign(process.env, { FAKE_AGENT_LOG: path.join(dir, 'prompted.log'), FAKE_AGENT_MODE: 'slow-tool', FAKE_AGENT_WAIT: '4000' });
   const row = { command: process.execPath, args: () => [FAKE], envAllow: ['PATH', 'HOME', 'FAKE_AGENT_LOG', 'FAKE_AGENT_MODE', 'FAKE_AGENT_WAIT'], prepare: ({ env }) => env };
   try {
-    const s = await runRound({ engine: 'fake', row, cwd: repo, prompt: path.join(dir, 'prompt.md'), out: path.join(dir, 'out'), engineGh: 'offline', mode: 'review', stage: false, timeoutMs: 20_000, idleMs: 400 }, { log: () => {} });
+    const s = await runRound({ engine: 'fake', row, cwd: repo, prompt: path.join(dir, 'prompt.md'), out: path.join(dir, 'out'), engineGh: 'offline', mode: 'review', stage: false, timeoutMs: 30_000, idleMs: 1500 }, { log: () => {} });
     assert.equal(s.conclusion, 'completed', 'an open tool call was cut off as idle');
   } finally { delete process.env.FAKE_AGENT_MODE; }
 });

@@ -52,6 +52,24 @@ describe('pre-push hook', () => {
     assert.match(run(line, [round([finding('🟠 Major')])], 'block').messages.at(-1), /--no-verify/);
   });
 
+  it('takes the round that finished last, whatever its directory is called (OBJ-028)', async () => {
+    const { localRounds } = await import('../src/hook.js');
+    const { mkdirSync, writeFileSync, utimesSync } = await import('node:fs');
+    const root = tmp();
+    const save = (name, findings, when) => {
+      const d = path.join(root, name); mkdirSync(d);
+      writeFileSync(path.join(d, 'round.json'), JSON.stringify({ mode: 'local', head_tree: 'T', base_sha: 'b'.repeat(40) }));
+      writeFileSync(path.join(d, 'events.jsonl'), findings.map((f) => JSON.stringify({ type: 'finding', ...f })).join('\n'));
+      writeFileSync(path.join(d, 'summary.json'), JSON.stringify({ conclusion: 'completed' }));
+      utimesSync(path.join(d, 'summary.json'), when, when);
+    };
+    save('local-x-9999999999999', [], new Date('2026-10-01T00:00:00Z'));
+    save('my-review', [finding('🔴 Critical')], new Date('2026-10-01T00:10:00Z'));
+    const rounds = localRounds(root);
+    assert.equal(path.basename(rounds[0].dir), 'my-review');
+    assert.equal(run([`refs/heads/x ${A} refs/heads/x ${R}`], rounds, 'block').code, 1);
+  });
+
   it('blocks on a withheld finding, whose severity is unknown (OBJ-027)', () => {
     const line = [`refs/heads/x ${A} refs/heads/x ${R}`];
     const r = run(line, [{ ...round([]), withheld: 1 }], 'block');
