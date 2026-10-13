@@ -81,6 +81,32 @@ describe('pre-push hook', () => {
     assert.equal(run(line, rounds, 'block').code, 1);
   });
 
+  it('any review of the same code with a finding or damage blocks, whatever its order (OBJ-032)', async () => {
+    const { localRounds } = await import('../src/hook.js');
+    const { mkdirSync, writeFileSync, rmSync } = await import('node:fs');
+    const line = [`refs/heads/x ${A} refs/heads/x ${R}`];
+    const crit = JSON.stringify({ type: 'finding', ...finding('🔴 Critical') });
+    const cases = {
+      'empty log, summary counted one': ['', 1],
+      'Critical without finished': [crit, 1],
+      'Critical, torn finished': [`${crit}\n{"type":"finished","at":`, 1],
+      'missing log': [null, 1],
+      'clean but no finished': ['', 0],
+    };
+    for (const [name, [log, count]] of Object.entries(cases)) {
+      const root = tmp();
+      const save = (dir, text, n) => {
+        mkdirSync(dir, { recursive: true });
+        writeFileSync(path.join(dir, 'round.json'), JSON.stringify({ mode: 'local', head_tree: 'T', base_sha: 'b'.repeat(40) }));
+        writeFileSync(path.join(dir, 'summary.json'), JSON.stringify({ conclusion: 'completed', findings: n }));
+        if (text === null) rmSync(path.join(dir, 'events.jsonl'), { force: true }); else writeFileSync(path.join(dir, 'events.jsonl'), text);
+      };
+      save(path.join(root, 'old-clean'), JSON.stringify({ type: 'finished', at: '2026-10-01T00:00:00Z' }), 0);
+      save(path.join(root, 'damaged'), log, count);
+      assert.equal(run(line, localRounds(root, path.join(root, 'none.jsonl')), 'block').code, 1, name);
+    }
+  });
+
   it('skips a ref that is not a commit and still checks the rest of the push (OBJ-029)', () => {
     const lines = [`refs/tags/blob ${'e'.repeat(40)} ${Z} ${Z}`, `refs/heads/x ${A} refs/heads/x ${R}`];
     const r = prePush({ lines, rounds: [round([finding('🔴 Critical')])], mode: 'block', treeOf: (sha) => (sha === A ? 'T' : null), isAncestor: () => true });

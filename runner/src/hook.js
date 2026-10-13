@@ -48,9 +48,9 @@ export function indexRound(dir, index = roundIndex()) {
   appendFileSync(index, JSON.stringify({ dir }) + '\n');
 }
 
-// Completed local rounds, newest first by the recorded finish time (adversary OBJ-028, OBJ-031).
-// A finding line that no longer parses, or fewer findings than the summary counted, is withheld:
-// the hook cannot say it was minor (adversary OBJ-032).
+// Completed local rounds, newest first. A round whose event log is missing, has a line that no
+// longer parses, lacks its finished event or holds fewer findings than its summary counted is
+// withheld: the hook cannot say it was minor (adversary OBJ-032).
 export function localRounds(root = path.join(assayerHome(), 'reviews'), index = roundIndex()) {
   const dirs = new Set(existsSync(root) ? readdirSync(root).map((n) => path.join(root, n)) : []);
   if (existsSync(index)) for (const l of readFileSync(index, 'utf8').split('\n')) { try { dirs.add(path.resolve(JSON.parse(l).dir)); } catch { /* torn line */ } }
@@ -60,10 +60,12 @@ export function localRounds(root = path.join(assayerHome(), 'reviews'), index = 
       const round = JSON.parse(readFileSync(path.join(dir, 'round.json'), 'utf8'));
       const summary = JSON.parse(readFileSync(path.join(dir, 'summary.json'), 'utf8'));
       if (round.mode !== 'local' || summary.conclusion !== 'completed') continue;
-      let broken = 0;
-      const events = readFileSync(path.join(dir, 'events.jsonl'), 'utf8').split('\n').filter(Boolean).flatMap((l) => { try { return [JSON.parse(l)]; } catch { broken += 1; return []; } });
+      let broken = 0; let text = '';
+      try { text = readFileSync(path.join(dir, 'events.jsonl'), 'utf8'); } catch { broken += 1; }
+      const events = text.split('\n').filter(Boolean).flatMap((l) => { try { return [JSON.parse(l)]; } catch { broken += 1; return []; } });
       const findings = events.filter((e) => e.type === 'finding');
       const finished = Date.parse(events.find((e) => e.type === 'finished')?.at ?? '');
+      if (Number.isNaN(finished)) broken += 1;
       const missing = Math.max(0, (Number.isInteger(summary.findings) ? summary.findings : 0) - findings.length);
       out.push({ dir, round, findings, withheld: withheldCount(summary) + missing + broken, mtime: Number.isNaN(finished) ? 0 : finished });
     } catch { /* an unfinished or foreign directory */ }
@@ -84,23 +86,30 @@ export function prePush({ lines, rounds, mode, treeOf, isAncestor }) {
     const tree = treeOf(lsha);
     // A tag or ref on a blob or tree carries no commit to review (adversary OBJ-029).
     if (tree === null) { messages.push(`assayer: ${lref} is not a commit; nothing to review`); continue; }
-    const round = rounds.find((r) => r.round.head_tree === tree && (isZero(rsha) || !rsha || isAncestor(r.round.base_sha, rsha)));
-    if (!round) {
+    // Every review of this exact tree counts, not only the newest: the code is the same, so a later
+    // clean run does not overrule an earlier finding, and no ordering can hide one (adversary OBJ-032).
+    const matching = rounds.filter((r) => r.round.head_tree === tree && (isZero(rsha) || !rsha || isAncestor(r.round.base_sha, rsha)));
+    if (!matching.length) {
       messages.push(`assayer: ${lref} at ${lsha.slice(0, 7)} has no local review. Run: assayer review --head ${lsha.slice(0, 7)}${isZero(rsha) || !rsha ? '' : ` --base ${rsha.slice(0, 7)}`}`);
       block = true;
       continue;
     }
-    const serious = round.findings.filter((f) => atLeastMajor(f.body));
-    // A withheld finding's severity is unknown, so it blocks like a major one (adversary OBJ-027).
-    if (round.withheld) messages.push(`assayer: ${lref}: round ${path.basename(round.dir)} withheld ${round.withheld} finding(s) Assayer could not read; see ${round.dir}`);
-    if (!serious.length && !round.withheld) { messages.push(`assayer: ${lref} reviewed, nothing major (${round.dir})`); continue; }
-    if (serious.length) messages.push(`assayer: ${lref} has ${serious.length} major or critical finding(s) from round ${path.basename(round.dir)}:`);
-    for (const f of serious) {
-      const after = f.body.slice(f.body.indexOf('</details>') + 1);
-      const title = (/\*\*(.+?)\*\*/.exec(after)?.[1] ?? '').replace(/[\x00-\x1f]/g, ' ').slice(0, 100);
-      const sev = severityOf(f.body);
-      messages.push(`  [${sev[0].toUpperCase()}${sev.slice(1)}] ${f.path}:${f.line ?? '?'}  ${title}`);
+    let flagged = false;
+    for (const round of matching) {
+      const serious = round.findings.filter((f) => atLeastMajor(f.body));
+      // A withheld finding's severity is unknown, so it blocks like a major one (adversary OBJ-027).
+      if (round.withheld) messages.push(`assayer: ${lref}: round ${path.basename(round.dir)} withheld ${round.withheld} finding(s) Assayer could not read; see ${round.dir}`);
+      if (serious.length) messages.push(`assayer: ${lref} has ${serious.length} major or critical finding(s) from round ${path.basename(round.dir)}:`);
+      for (const f of serious) {
+        const after = f.body.slice(f.body.indexOf('</details>') + 1);
+        const title = (/\*\*(.+?)\*\*/.exec(after)?.[1] ?? '').replace(/[\x00-\x1f]/g, ' ').slice(0, 100);
+        const sev = severityOf(f.body);
+        messages.push(`  [${sev[0].toUpperCase()}${sev.slice(1)}] ${f.path}:${f.line ?? '?'}  ${title}`);
+      }
+      flagged ||= serious.length > 0 || round.withheld > 0;
     }
+    if (!flagged) { messages.push(`assayer: ${lref} reviewed, nothing major (${matching[0].dir})`); continue; }
+    if (matching.length > 1) messages.push(`assayer: every review of this exact code counts; delete a round directory you no longer trust`);
     block = true;
   }
   if (block && mode === 'block') messages.push('assayer: push blocked (assayer.prepush=block); `git push --no-verify` skips the check');

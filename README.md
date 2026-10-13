@@ -52,7 +52,7 @@ With `--post`, each finding lands as an inline comment ending in a hidden `assay
 
 `assayer review` with no pull request reviews what you have not pushed yet: unpushed commits plus staged, unstaged and untracked files. It compares against your branch's upstream, or `origin`'s default branch, or `main`; `--base <ref>` picks another. Your working tree, index and stash are never touched: the round reviews a snapshot in its own checkout. It only prints, and `--fail-on major` makes it exit 4 when it finds anything major or worse.
 
-`assayer hook install` adds an opt-in pre-push hook. It never starts a review, because a review takes minutes. It checks whether the commit you are pushing was reviewed and what was found, warns by default, and blocks only with `git config assayer.prepush block`. `git push --no-verify` always skips it.
+`assayer hook install` adds an opt-in pre-push hook. It never starts a review, because a review takes minutes. It checks whether the commit you are pushing was reviewed and what was found, counting every review of that exact code, so a later clean run does not hide an earlier finding. It warns by default, and blocks only with `git config assayer.prepush block`. `git push --no-verify` always skips it.
 
 ## How it works
 
