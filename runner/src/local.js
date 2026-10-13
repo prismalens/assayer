@@ -113,8 +113,8 @@ export function sameTree(cwd, a, b) {
 export const isZero = (sha) => ZERO.test(sha ?? '');
 
 // A finding's first line is `_Category_ | _Severity_ | _Effort_`. The label sits between
-// underscores, which \b treats as word characters. Unreadable counts as major, so a finding
-// is never quietly below a threshold.
-export function severityOf(body) {
-  return (/(?<![A-Za-z])(Critical|Major|Minor)(?![A-Za-z])/.exec(String(body ?? '').split('\n')[0])?.[1] ?? 'Major').toLowerCase();
+// underscores, which \b treats as word characters. Unreadable shows as major; a threshold check
+// passes `unreadable: 'critical'` so it counts at every level (adversary OBJ-026).
+export function severityOf(body, unreadable = 'major') {
+  return (/(?<![A-Za-z])(critical|major|minor)(?![A-Za-z])/i.exec(String(body ?? '').split('\n')[0])?.[1] ?? unreadable).toLowerCase();
 }

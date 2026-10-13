@@ -149,6 +149,9 @@ describe('local prompt and CLI', () => {
   it('maps severities onto --fail-on, counting an unreadable one as major', () => {
     const f = (sev) => ({ body: `_🎯 Functional Correctness_ | _${sev}_ | _⚡ Quick win_\nbody` });
     assert.equal(severityOf('no header').toString(), 'major');
+    assert.equal(severityOf('_bug_ | _critical_ | _x_'), 'critical', 'any case (OBJ-026)');
+    assert.equal(atOrAbove([{ body: 'no header at all' }], 'critical'), 1, 'unreadable counts at every threshold');
+    assert.equal(atOrAbove([{ body: '_bug_ | _critical_ | _x_' }], 'critical'), 1);
     const findings = [f('🔴 Critical'), f('🟠 Major'), f('🟡 Minor')];
     assert.deepEqual(['critical', 'major', 'minor', null].map((x) => atOrAbove(findings, x)), [1, 2, 3, 0]);
   });

@@ -271,7 +271,7 @@ async function publishOnce(dir, { log = (s) => process.stderr.write(s + '\n'), f
 export function atOrAbove(findings, failOn) {
   if (!failOn) return 0;
   const rank = (x) => SEVERITIES.indexOf(x);
-  return findings.filter((f) => rank(severityOf(f.body)) <= rank(failOn)).length;
+  return findings.filter((f) => rank(severityOf(f.body, 'critical')) <= rank(failOn)).length;
 }
 
 export function readFindings(dir) {

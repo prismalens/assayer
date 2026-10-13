@@ -241,3 +241,20 @@ test('only an identical re-filing merges; distinct defects on one or adjacent li
   assert.deepEqual(evs.filter((e) => e.type === 'finding').map((e) => e.line), [10, 11, 20, 20, 30]);
   assert.equal(m.dropped.filter((d) => d.merged).length, 1);
 });
+
+test('same title, different body or severity: both stay, so a Critical never hides behind a Minor (OBJ-019)', async () => {
+  const { atOrAbove } = await import('../src/review.js');
+  const f = (sev, t, body, startLine) => ({ tool: 'create_inline_comment', input: { path: 'src/a.ts', line: 30, startLine, body: `_🔒 Security & Privacy_ | _${sev}_ | _⚡ Quick win_\n\n**${t}**\n\n${body}` } });
+  const m = mk();
+  const evs = m.finish({ toolLog: [
+    f('🟡 Minor', 'Log omits IP', 'The audit line has no client IP.'),
+    f('🔴 Critical', 'Log omits ID', 'Any user can read another user\'s rows.'),
+    f('🟡 Minor', 'Cache key omits userId', 'Same text.'),
+    f('🔴 Critical', 'Cache key omits userId', 'Same text.'),
+    f('🟡 Minor', 'Range', 'Same.', 20),
+    f('🟡 Minor', 'Range', 'Same.', 25),
+  ] });
+  const found = evs.filter((e) => e.type === 'finding');
+  assert.equal(found.length, 6);
+  assert.equal(atOrAbove(found, 'critical'), 2);
+});

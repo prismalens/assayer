@@ -169,16 +169,16 @@ export class SessionMapper {
     }
   }
 
-  // A finding filed twice, identically (same file, side and line, same title), posts once. Nothing
+  // A finding filed twice, identically (same file, side, range and body), posts once. Nothing
   // looser merges: every similarity rule tried also merged distinct defects (adversary OBJ-019).
   #mergeDuplicates() {
     const seen = new Map();
     const drop = new Set();
     this.events.forEach((e, i) => {
       if (e.type !== 'finding' || !Number.isInteger(e.line)) return;
-      const title = [...titleWords(e.body)].join(' ');
-      if (!title) return;
-      const key = `${e.path}|${e.side}|${e.line}|${title}`;
+      const body = String(e.body ?? '').replace(/\s+/g, ' ').trim();
+      if (!body) return;
+      const key = JSON.stringify([e.path, e.side, e._meta?.start_line ?? null, e.line, body]);
       if (seen.has(key)) { drop.add(i); this.dropped.push({ why: `identical to the finding at ${e.path}:${e.line}`, merged: true, line: e.line }); } else seen.set(key, i);
     });
     if (drop.size) this.events = this.events.filter((_, i) => !drop.has(i));
@@ -264,10 +264,3 @@ export function readToolLog(file) {
   return { entries, corrupt };
 }
 
-const STOP = new Set(['the', 'and', 'for', 'from', 'with', 'that', 'this', 'are', 'not', 'its', 'into', 'when', 'than', 'then', 'one', 'another', 'other']);
-// Content words of a finding's bold title, lowercased and with a plural s dropped.
-function titleWords(body) {
-  const after = String(body ?? '').slice(String(body ?? '').indexOf('</details>') + 1);
-  const title = /\*\*(.+?)\*\*/.exec(after)?.[1] ?? '';
-  return new Set(title.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 2 && !STOP.has(w)).map((w) => w.replace(/(?<=..)s$/, '')));
-}
