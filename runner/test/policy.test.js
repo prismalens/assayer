@@ -102,3 +102,10 @@ test('a double-quoted body may escape a backtick or a dollar, and nothing else e
     assert.equal(commandAllowed(c), false, c);
   }
 });
+
+test("an apostrophe written the other bash way ('\\'') passes, and nothing around it expands", () => {
+  assert.equal(commandAllowed("gh pr comment 13 --repo o/r --body '## Code review\nanother user'\\''s cached response'"), true);
+  // As Codex sends it: the whole command as one double-quoted word.
+  assert.equal(decide({ kind: 'execute', rawInput: { command: "\"gh pr comment 13 --repo o/r --body '## Code review\nuser'\\\\''s page'\"" } }).allow, true);
+  for (const c of ["gh pr comment 13 --body 'a'\\''b'$(id)", "gh pr comment 13 --body 'a'\\'; id", "gh pr comment 13 --body 'a'\\''b' | sh"]) assert.equal(commandAllowed(c), false, c);
+});

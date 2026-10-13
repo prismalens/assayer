@@ -31,9 +31,9 @@ const COMMENT_TOOL_IDS = Object.freeze(new Set([
 const READ_KINDS = new Set(['read', 'search', 'think']);
 
 // A summary body may span lines only inside quotes bash expands nothing in: single quotes
-// (an apostrophe as '"'"'), or double quotes whose only backslashes escape a ` or $ (Claude
+// (an apostrophe as '"'"' or '\''), or double quotes whose only backslashes escape a ` or $ (Claude
 // Code writes code spans that way). The words around it pass the usual check.
-const COMMENT_BODY = /^(gh pr comment(?:[ \t]+[\w./:=,@#+-]+)*)[ \t]+(?:--body|-b)[ \t]+(?:'[^']*'(?:"'"'[^']*')*|"(?:[^"$`\\]|\\[`$])*")((?:[ \t]+[\w./:=,@#+-]+)*)$/;
+const COMMENT_BODY = /^(gh pr comment(?:[ \t]+[\w./:=,@#+-]+)*)[ \t]+(?:--body|-b)[ \t]+(?:'[^']*'(?:(?:"'"|\\')'[^']*')*|"(?:[^"$`\\]|\\[`$])*")((?:[ \t]+[\w./:=,@#+-]+)*)$/;
 
 export function commandAllowed(command) {
   // A quoted body may hold line feeds and tabs; no other control character passes, quoted or not.
