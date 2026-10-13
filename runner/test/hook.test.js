@@ -20,17 +20,20 @@ const run = (lines, rounds, mode, ancestor = true) => prePush({ lines, rounds, m
 describe('pre-push hook', () => {
   it('installs, refuses a foreign hook, and uninstalls only its own', () => {
     const d = repo();
-    const p = install(d, '/bin/assayer');
+    const p = install(d, '/bin/assayer', {});
     assert.match(readFileSync(p, 'utf8'), new RegExp(MARKER));
     assert.equal(uninstall(d), p);
     assert.equal(existsSync(p), false);
     writeFileSync(p, '#!/bin/sh\necho mine\n');
-    assert.throws(() => install(d, '/bin/assayer'), /another pre-push hook/);
+    assert.throws(() => install(d, '/bin/assayer', {}), /another pre-push hook/);
     assert.throws(() => uninstall(d), /not assayer's hook/);
   });
 
   it('refuses to install from an npx run, which leaves nothing on PATH for the hook to call', () => {
     assert.throws(() => install(repo(), null), /npm i -g @prismalens\/assayer/);
+    for (const env of [{ npm_execpath: '/x/npm-cli.js' }, { BERRY_BIN_FOLDER: '/tmp/xfs-1' }]) {
+      assert.throws(() => install(repo(), '/usr/bin/assayer', env), /npm i -g/, JSON.stringify(env));
+    }
   });
 
   it('names the command as the user ran it: the PATH one, or the npx form for any other run', async () => {
@@ -43,13 +46,16 @@ describe('pre-push hook', () => {
     const bin = path.join(tmp(), 'node_modules', '.bin'); (await import('node:fs')).mkdirSync(bin, { recursive: true });
     (await import('node:fs')).symlinkSync(me, path.join(bin, 'assayer'));
     assert.equal(onPath({ PATH: bin }), null, 'an npx or npm-script bin is not the user\'s PATH');
+    const xfs = path.join(tmp(), 'xfs-123'); (await import('node:fs')).mkdirSync(xfs);
+    (await import('node:fs')).symlinkSync(me, path.join(xfs, 'assayer'));
+    assert.equal(onPath({ PATH: xfs }), null, 'a yarn dlx wrapper folder is temporary');
   });
 
   it('honours core.hooksPath', () => {
     const d = repo();
     mkdirSync(path.join(d, 'hooks-here'));
     execFileSync('git', ['config', 'core.hooksPath', 'hooks-here'], { cwd: d });
-    assert.equal(install(d, '/bin/assayer'), path.join(d, 'hooks-here', 'pre-push'));
+    assert.equal(install(d, '/bin/assayer', {}), path.join(d, 'hooks-here', 'pre-push'));
   });
 
   it('reads the mode from the environment, then git config, then defaults to warn', () => {

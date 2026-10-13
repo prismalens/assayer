@@ -7,8 +7,10 @@ import { ENGINES } from './engines.js';
 
 // The `assayer` on the user's own PATH, resolved through links, or null. npx, dlx and npm scripts
 // prepend a node_modules/.bin that the user's shell will not have when they type a hint.
-export function onPath(env = process.env) {
-  for (const dir of (env.PATH ?? '').split(path.delimiter).filter((d) => d && !/node_modules[\\/]\.bin[\\/]?$/.test(d))) {
+// Yarn dlx's wrappers sit in a temporary xfs-* folder, so the temp directory is skipped too (OBJ-035).
+export function onPath(env = process.env, tmp = os.tmpdir()) {
+  const ephemeral = (d) => /node_modules[\\/]\.bin[\\/]?$/.test(d) || path.resolve(d).startsWith(path.resolve(tmp) + path.sep);
+  for (const dir of (env.PATH ?? '').split(path.delimiter).filter((d) => d && !ephemeral(d))) {
     try { return realpathSync(path.join(dir, 'assayer')); } catch { /* not here */ }
   }
   return null;

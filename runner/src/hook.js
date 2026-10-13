@@ -19,9 +19,10 @@ function hookPath(cwd) {
   return path.isAbsolute(p) ? p : path.join(git(cwd, ['rev-parse', '--show-toplevel']), p);
 }
 
-export function install(cwd = process.cwd(), found = onPath()) {
-  // The hook runs `assayer` from PATH; an npx run leaves nothing there.
-  if (!found) throw new Error('the hook needs assayer on PATH; install it first with `npm i -g @prismalens/assayer`');
+export function install(cwd = process.cwd(), found = onPath(), env = process.env) {
+  // The hook runs `assayer` from PATH. A package runner (npx, pnpm and yarn dlx, bunx) sets one of
+  // these and leaves nothing there once it exits (adversary OBJ-035).
+  if (!found || env.npm_execpath || env.BERRY_BIN_FOLDER) throw new Error('the hook needs assayer on PATH; install it first with `npm i -g @prismalens/assayer`, then run `assayer hook install`');
   const p = hookPath(cwd);
   if (existsSync(p) && !readFileSync(p, 'utf8').includes(MARKER)) throw new Error(`${p} is another pre-push hook; assayer leaves it alone`);
   mkdirSync(path.dirname(p), { recursive: true });
