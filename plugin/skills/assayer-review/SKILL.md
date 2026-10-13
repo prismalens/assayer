@@ -2,7 +2,7 @@
 name: assayer-review
 description: "Run an Assayer review round on a pull request with the user's own engine sign-in, and work the findings Assayer posts. Load when the user asks for a review before merging or pushing, when an `assayer review` command or round directory is in front of you, or when a review thread ends in `<!-- assayer-finding engine=... -->`."
 metadata:
-  version: "0.1.0"
+  version: "0.0.1"
 ---
 
 # Assayer review
