@@ -1,12 +1,26 @@
 // The user's defaults in ~/.assayer/config.json. A flag beats the file, the file beats the
 // built-in default. The first round on a terminal with no engine anywhere asks once and saves it.
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { ENGINES } from './engines.js';
 
-// The command as the user ran it: under npx there is no `assayer` on PATH, so a hint naming it fails.
-export const SELF = (process.argv[1] ?? '').includes(`${path.sep}_npx${path.sep}`) ? 'npx @prismalens/assayer' : 'assayer';
+// The `assayer` on the user's own PATH, resolved through links, or null. npx, dlx and npm scripts
+// prepend a node_modules/.bin that the user's shell will not have when they type a hint.
+export function onPath(env = process.env) {
+  for (const dir of (env.PATH ?? '').split(path.delimiter).filter((d) => d && !/node_modules[\\/]\.bin[\\/]?$/.test(d))) {
+    try { return realpathSync(path.join(dir, 'assayer')); } catch { /* not here */ }
+  }
+  return null;
+}
+// The command as the user ran it. npx, pnpm dlx, yarn dlx and bunx leave no `assayer` on PATH,
+// so a hint naming it would fail; any run that is not the PATH one gets the npx form.
+export function selfCommand(script = process.argv[1], found = onPath()) {
+  let me = null;
+  try { me = script && realpathSync(script); } catch { me = null; }
+  return found && me && found === me ? 'assayer' : 'npx @prismalens/assayer';
+}
+export const SELF = selfCommand();
 
 export const DEFAULT_ENGINE = 'codex';
 const SEVERITIES = ['critical', 'major', 'minor'];

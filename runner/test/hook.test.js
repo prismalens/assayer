@@ -20,24 +20,36 @@ const run = (lines, rounds, mode, ancestor = true) => prePush({ lines, rounds, m
 describe('pre-push hook', () => {
   it('installs, refuses a foreign hook, and uninstalls only its own', () => {
     const d = repo();
-    const p = install(d);
+    const p = install(d, '/bin/assayer');
     assert.match(readFileSync(p, 'utf8'), new RegExp(MARKER));
     assert.equal(uninstall(d), p);
     assert.equal(existsSync(p), false);
     writeFileSync(p, '#!/bin/sh\necho mine\n');
-    assert.throws(() => install(d), /another pre-push hook/);
+    assert.throws(() => install(d, '/bin/assayer'), /another pre-push hook/);
     assert.throws(() => uninstall(d), /not assayer's hook/);
   });
 
   it('refuses to install from an npx run, which leaves nothing on PATH for the hook to call', () => {
-    assert.throws(() => install(repo(), 'npx @prismalens/assayer'), /npm i -g @prismalens\/assayer/);
+    assert.throws(() => install(repo(), null), /npm i -g @prismalens\/assayer/);
+  });
+
+  it('names the command as the user ran it: the PATH one, or the npx form for any other run', async () => {
+    const { selfCommand } = await import('../src/settings.js');
+    const me = path.resolve('src/review.js');
+    assert.equal(selfCommand(me, me), 'assayer');
+    assert.equal(selfCommand(me, null), 'npx @prismalens/assayer');
+    assert.equal(selfCommand(me, '/usr/lib/node_modules/other/assayer.js'), 'npx @prismalens/assayer');
+    const { onPath } = await import('../src/settings.js');
+    const bin = path.join(tmp(), 'node_modules', '.bin'); (await import('node:fs')).mkdirSync(bin, { recursive: true });
+    (await import('node:fs')).symlinkSync(me, path.join(bin, 'assayer'));
+    assert.equal(onPath({ PATH: bin }), null, 'an npx or npm-script bin is not the user\'s PATH');
   });
 
   it('honours core.hooksPath', () => {
     const d = repo();
     mkdirSync(path.join(d, 'hooks-here'));
     execFileSync('git', ['config', 'core.hooksPath', 'hooks-here'], { cwd: d });
-    assert.equal(install(d), path.join(d, 'hooks-here', 'pre-push'));
+    assert.equal(install(d, '/bin/assayer'), path.join(d, 'hooks-here', 'pre-push'));
   });
 
   it('reads the mode from the environment, then git config, then defaults to warn', () => {
@@ -129,7 +141,7 @@ describe('pre-push hook', () => {
     const line = [`refs/heads/x ${A} refs/heads/x ${R}`];
     const r = run(line, [round([])], 'block', false);
     assert.equal(r.code, 1);
-    assert.match(r.messages[0], /no local review\. Run: assayer review --head aaaaaaa --base ccccccc/);
+    assert.match(r.messages[0], /no local review\. Run: (npx @prismalens\/)?assayer review --head aaaaaaa --base ccccccc/);
     assert.equal(run([`(delete) ${Z} refs/heads/x ${R}`], [], 'block').code, 0);
     assert.deepEqual(run(line, [], 'off'), { code: 0, messages: [] });
   });

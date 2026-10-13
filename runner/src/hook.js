@@ -4,7 +4,7 @@
 import { appendFileSync, existsSync, readFileSync, readdirSync, rmSync, writeFileSync, chmodSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { git, isZero, severityOf, withheldCount } from './local.js';
-import { assayerHome, SELF } from './settings.js';
+import { assayerHome, onPath, SELF } from './settings.js';
 
 export const MARKER = '# assayer pre-push hook';
 const SCRIPT = `#!/bin/sh
@@ -19,9 +19,9 @@ function hookPath(cwd) {
   return path.isAbsolute(p) ? p : path.join(git(cwd, ['rev-parse', '--show-toplevel']), p);
 }
 
-export function install(cwd = process.cwd(), self = SELF) {
+export function install(cwd = process.cwd(), found = onPath()) {
   // The hook runs `assayer` from PATH; an npx run leaves nothing there.
-  if (self !== 'assayer') throw new Error('the hook needs assayer on PATH; install it first with `npm i -g @prismalens/assayer`');
+  if (!found) throw new Error('the hook needs assayer on PATH; install it first with `npm i -g @prismalens/assayer`');
   const p = hookPath(cwd);
   if (existsSync(p) && !readFileSync(p, 'utf8').includes(MARKER)) throw new Error(`${p} is another pre-push hook; assayer leaves it alone`);
   mkdirSync(path.dirname(p), { recursive: true });
