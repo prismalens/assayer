@@ -114,7 +114,7 @@ export const isZero = (sha) => ZERO.test(sha ?? '');
 
 // A finding's first line is `_Category_ | _Severity_ | _Effort_`; only the middle field is read,
 // since a category or effort can name a severity word. Any other shape is unreadable: shown as
-// major, and a threshold check passes `unreadable: 'critical'` (adversary OBJ-026).
+// major, and a threshold check passes `unreadable: 'critical'`.
 export function severityOf(body, unreadable = 'major') {
   const fields = String(body ?? '').split('\n')[0].split('|');
   const label = fields.length === 3 ? /^[\s_]*(?:\p{Extended_Pictographic}\uFE0F?\s*)?(critical|major|minor)[\s_]*$/iu.exec(fields[1])?.[1] : null;
@@ -122,7 +122,7 @@ export function severityOf(body, unreadable = 'major') {
 }
 
 // Findings the runner lost before they became events. A corrupt tool-log line may have been
-// one, so it counts as withheld rather than letting the verdict say "no findings" (OBJ-005).
+// one, so it counts as withheld rather than letting the verdict say "no findings".
 export function withheldCount(summary) {
   const dropped = (summary.dropped ?? []).filter((d) => !d.merged && (d.tool === 'create_inline_comment' || /finding/i.test(d.why ?? ''))).length;
   return dropped + (summary.tool_log_corrupt_lines ?? 0);

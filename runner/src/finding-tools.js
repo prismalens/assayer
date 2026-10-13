@@ -52,7 +52,7 @@ if (which === 'github_inline_comment') {
     },
   }, async (input) => {
     // Every finding is recorded: a refused one could be lost if the engine never re-filed it, and
-    // no heuristic told a re-filing from a new defect (adversary OBJ-019, OBJ-021). A finding off
+    // no heuristic told a re-filing from a new defect. A finding off
     // the diff posts as a plain comment; the reply says what was off, for the next finding.
     record('create_inline_comment', input);
     const problem = formatProblem(input.body) ?? (diff && anchorProblem(diff, input, process.env.ASSAYER_CHECKOUT || null));

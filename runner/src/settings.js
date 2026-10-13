@@ -7,8 +7,8 @@ import { ENGINES } from './engines.js';
 
 // The `assayer` on the user's own PATH, resolved through links, or null. npx, dlx and npm scripts
 // prepend a node_modules/.bin that the user's shell will not have when they type a hint.
-// Yarn dlx's wrappers sit in a temporary xfs-* folder (OBJ-035); only that folder is skipped, since
-// a TMPDIR can hold a lasting global install (OBJ-037).
+// Yarn dlx's wrappers sit in a temporary xfs-* folder; only that folder is skipped, since
+// a TMPDIR can hold a lasting global install.
 export function onPath(env = process.env) {
   const ephemeral = (d) => /node_modules[\\/]\.bin[\\/]?$/.test(d) || /[\\/]xfs-[^\\/]+[\\/]?$/.test(d) || (env.BERRY_BIN_FOLDER && path.resolve(d) === path.resolve(env.BERRY_BIN_FOLDER));
   for (const dir of (env.PATH ?? '').split(path.delimiter).filter((d) => d && !ephemeral(d))) {
@@ -16,7 +16,7 @@ export function onPath(env = process.env) {
   }
   return null;
 }
-// pnpm installs a shell shim, not a link; it names its script on a `cmd-shim-target=` line (OBJ-039).
+// pnpm installs a shell shim, not a link; it names its script on a `cmd-shim-target=` line.
 function shimTarget(file) {
   let head = '';
   try { head = readFileSync(file, 'utf8').slice(0, 8192); } catch { return file; }

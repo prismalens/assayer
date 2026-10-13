@@ -50,10 +50,10 @@ describe('pre-push hook', () => {
     assert.equal(onPath({ PATH: xfs }), null, 'a yarn dlx wrapper folder is temporary');
     const prefix = path.join(tmp(), 'global', 'bin'); (await import('node:fs')).mkdirSync(prefix, { recursive: true });
     (await import('node:fs')).symlinkSync(me, path.join(prefix, 'assayer'));
-    assert.equal(onPath({ PATH: prefix }), me, 'a lasting install under TMPDIR still counts (OBJ-037)');
+    assert.equal(onPath({ PATH: prefix }), me, 'a lasting install under TMPDIR still counts');
     const pnpm = path.join(tmp(), 'pnpm', 'bin'); (await import('node:fs')).mkdirSync(pnpm, { recursive: true });
     (await import('node:fs')).writeFileSync(path.join(pnpm, 'assayer'), `#!/bin/sh\nexec node "$basedir/x/review.js" "$@"\n# cmd-shim-target=${me}\n`, { mode: 0o755 });
-    assert.equal(onPath({ PATH: pnpm }), me, 'a pnpm shell shim resolves to its script (OBJ-039)');
+    assert.equal(onPath({ PATH: pnpm }), me, 'a pnpm shell shim resolves to its script');
   });
 
   it('honours core.hooksPath', () => {
@@ -79,7 +79,7 @@ describe('pre-push hook', () => {
     assert.match(run(line, [round([finding('🟠 Major')])], 'block').messages.at(-1), /--no-verify/);
   });
 
-  it('finds every indexed round wherever --out put it, newest by recorded finish, and withholds damaged ones (OBJ-028, 030, 031, 032)', async () => {
+  it('finds every indexed round wherever --out put it, newest by recorded finish, and withholds damaged ones', async () => {
     const { localRounds, indexRound } = await import('../src/hook.js');
     const { mkdirSync, writeFileSync, utimesSync } = await import('node:fs');
     const root = tmp(); const index = path.join(tmp(), 'local-rounds.jsonl');
@@ -108,7 +108,7 @@ describe('pre-push hook', () => {
     assert.equal(run(line, rounds, 'block').code, 1);
   });
 
-  it('any review of the same code with a finding or damage blocks, whatever its order (OBJ-032)', async () => {
+  it('any review of the same code with a finding or damage blocks, whatever its order', async () => {
     const { localRounds } = await import('../src/hook.js');
     const { mkdirSync, writeFileSync, rmSync } = await import('node:fs');
     const line = [`refs/heads/x ${A} refs/heads/x ${R}`];
@@ -145,14 +145,14 @@ describe('pre-push hook', () => {
     }
   });
 
-  it('skips a ref that is not a commit and still checks the rest of the push (OBJ-029)', () => {
+  it('skips a ref that is not a commit and still checks the rest of the push', () => {
     const lines = [`refs/tags/blob ${'e'.repeat(40)} ${Z} ${Z}`, `refs/heads/x ${A} refs/heads/x ${R}`];
     const r = prePush({ lines, rounds: [round([finding('🔴 Critical')])], mode: 'block', treeOf: (sha) => (sha === A ? 'T' : null), isAncestor: () => true });
     assert.equal(r.code, 1);
     assert.match(r.messages[0], /not a commit/);
   });
 
-  it('blocks on a withheld finding, whose severity is unknown (OBJ-027)', () => {
+  it('blocks on a withheld finding, whose severity is unknown', () => {
     const line = [`refs/heads/x ${A} refs/heads/x ${R}`];
     const r = run(line, [{ ...round([]), withheld: 1 }], 'block');
     assert.equal(r.code, 1);

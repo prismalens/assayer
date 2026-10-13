@@ -17,7 +17,7 @@ function run(spawn, args, { cwd, env, timeoutMs }) {
 }
 
 // Symlinks check out as plain files holding their target, so no engine can follow a link the
-// pull request adds out of the checkout (an OpenCode canary read one; run-plan 2026-10-13).
+// pull request adds out of the checkout (an OpenCode canary read one).
 // The token travels in the environment as an extraheader, never in argv or a URL, so `ps`
 // never shows it (actions/checkout's header, set through GIT_CONFIG_* instead of a file).
 export async function checkout({ repository, headSha, baseSha, token, dir, spawn = nodeSpawn, timeoutMs = 120000 }) {

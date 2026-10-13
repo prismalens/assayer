@@ -152,7 +152,7 @@ export async function buildManifest({
   }
 
   // The size refusal (principle 10) arrives as manifest.py's `refused=` output line, relayed
-  // to stderr outside Actions. A refused round never reaches the engine (OBJ-002).
+  // to stderr outside Actions. A refused round never reaches the engine.
   const refused = /^refused=true$/m.test(stderr);
   return { manifest, diffBytes, stderr, refused };
 }

@@ -30,7 +30,7 @@ describe('assayer review (#184)', () => {
     assert.throws(() => parseArgs(['review', 'a/b#1', '--bogus']), /unknown argument/);
   });
 
-  it('parses liveness markers and blocks a head this engine already reviewed (OBJ-001)', () => {
+  it('parses liveness markers and blocks a head this engine already reviewed', () => {
     const recs = livenessRecords([live(), { id: 2, user: { login: 'x' }, body: 'hello' }]);
     assert.equal(recs.length, 1);
     assert.deepEqual({ sha: recs[0].sha, engine: recs[0].engine, rounds: recs[0].rounds, reviewed: recs[0].reviewed }, { sha: HEAD, engine: 'codex', rounds: 2, reviewed: true });
@@ -49,7 +49,7 @@ describe('assayer review (#184)', () => {
     assert.ok(priorReview(bot, { headSha: HEAD, engine: 'codex', canWrite: () => false }));
   });
 
-  it('counts a corrupt tool-log line as a withheld finding (OBJ-005)', () => {
+  it('counts a corrupt tool-log line as a withheld finding', () => {
     assert.equal(withheldCount({ dropped: [{ tool: 'create_inline_comment' }, { tool: 'post_summary' }], tool_log_corrupt_lines: 2 }), 3);
     assert.equal(withheldCount({}), 0);
   });

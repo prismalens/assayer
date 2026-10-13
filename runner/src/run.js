@@ -135,7 +135,7 @@ export async function runRound(opts, { log = (s) => process.stderr.write(s + '\n
     // The shim is a copy in <out>/bin; secret-check.js stays here beside its imports.
     ASSAYER_SECRET_CHECK: path.join(HERE, 'secret-check.js'),
     // A local round runs on the operator's own login, which is a broad write token. The
-    // engine gets an empty gh config instead, so its gh reads fail closed (OBJ-018).
+    // engine gets an empty gh config instead, so its gh reads fail closed.
     ...(opts.engineGh === 'offline' ? { GH_CONFIG_DIR: path.join(out, 'gh-offline') } : {}),
   } });
   if (opts.engineGh === 'offline') mkdirSync(path.join(out, 'gh-offline'), { recursive: true });
@@ -185,8 +185,8 @@ export async function runRound(opts, { log = (s) => process.stderr.write(s + '\n
         try { ctx.notify?.(acp.methods.agent.session.cancel, { sessionId: mapper.sessionId }); } catch { /* fall through to kill */ }
         setTimeout(() => child.kill('SIGKILL'), 5000).unref();
       };
-      // No outside signal tells a slow subagent from one whose provider stalled (adversary OBJ-033,
-      // OBJ-034), so an open one waits for the wall clock, which then names the quiet stall.
+      // No outside signal tells a slow subagent from one whose provider stalled, so an open one
+      // waits for the wall clock, which then names the quiet stall.
       timer = setTimeout(() => cancel(open.size && Date.now() - lastUpdate >= opts.idleMs ? 'stalled' : 'wall-clock'), opts.timeoutMs);
       const onIdle = () => {
         if (open.size) { raw('idle_deferred', { open: open.size }); idle = setTimeout(onIdle, opts.idleMs); return; }
@@ -263,7 +263,7 @@ if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.me
 
 
 // The prompts treat AGENTS.md and CLAUDE.md as the repository's rules, so a pull request could
-// rewrite them to excuse its own defect (adversary OBJ-020). The checkout keeps the base commit's
+// rewrite them to excuse its own defect. The checkout keeps the base commit's
 // versions; the pull request's changes to them are still reviewed in the staged diff.
 export function pinInstructionFiles(cwd, baseSha, headSha) {
   const git = (args) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
@@ -273,8 +273,7 @@ export function pinInstructionFiles(cwd, baseSha, headSha) {
     let base = null;
     try { base = execFileSync('git', ['show', `${baseSha}:${rel}`], { cwd, stdio: ['ignore', 'pipe', 'ignore'] }); } catch { /* added by the pull request */ }
     // Only a plain file or link is ever replaced or removed. A path the pull request turned into a
-    // directory keeps its contents, and a restore that cannot be made is skipped, never fatal
-    // (adversary OBJ-023, OBJ-025).
+    // directory keeps its contents, and a restore that cannot be made is skipped, never fatal.
     let kind = null;
     try { const st = lstatSync(file); kind = st.isDirectory() ? 'dir' : 'file'; } catch { kind = null; }
     if (kind === 'dir') continue;

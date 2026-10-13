@@ -170,7 +170,7 @@ export class SessionMapper {
   }
 
   // A finding filed twice, byte for byte (same file, side, range and body), posts once. Nothing
-  // looser merges: every normalisation tried also merged distinct filings (adversary OBJ-019).
+  // looser merges: every normalisation tried also merged distinct filings.
   #mergeDuplicates() {
     const seen = new Map();
     const drop = new Set();

@@ -29,8 +29,8 @@ export function findingMarker(engine) {
 }
 
 // Prose in a posted body never @-mentions: a finding that quotes `@claude review` would otherwise
-// summon a lane from the operator's own login (OBJ-023). Code spans and fences stay byte-exact,
-// so a suggestion or a decorator still applies (OBJ-027).
+// summon a lane from the operator's own login. Code spans and fences stay byte-exact,
+// so a suggestion or a decorator still applies.
 export function quiet(text) {
   if (typeof text !== "string") return text;
   // Only GFM text nodes are prose; code, HTML and everything else keep their bytes.
@@ -74,7 +74,7 @@ export function livenessBody({ rounds, headSha, engine, model, verdict }) {
 export function roundVerdict({ conclusion, headSha, findings, failureClass, unplaced = 0, dropped = 0 }) {
   const short = String(headSha).slice(0, 7);
   if (conclusion === "completed") {
-    // A finding GitHub would not anchor is still a finding: "no findings" would be false (OBJ-005).
+    // A finding GitHub would not anchor is still a finding: "no findings" would be false.
     const missed = unplaced > 0 ? `, ${unplaced} not placed inline (posted as comments)` : "";
     const lost = dropped > 0 ? `, ${dropped} withheld (credential-shaped, oversized or unreadable)` : "";
     if (findings === 0 && unplaced === 0 && dropped === 0) return `reviewed \`${short}\`, no findings.`;
@@ -115,7 +115,7 @@ export async function upsertLiveness({ fetch: fetchImpl, token, appLogin, reposi
     if (rows.length < 100) break;
   }
   // Asked after the lookup, as close to the write as the API allows: GitHub has no conditional
-  // comment update, so a head that moves in between is the remaining window (OBJ-004).
+  // comment update, so a head that moves in between is the remaining window.
   if (beforeWrite && !(await beforeWrite())) return false;
   if (existing !== null) {
     await call(fetchImpl, token, "PATCH", `/repos/${repository}/issues/comments/${existing}`, { body });
@@ -129,10 +129,10 @@ export async function upsertLiveness({ fetch: fetchImpl, token, appLogin, reposi
 // a finding GitHub refuses (a line outside the diff, say) is counted, never fatal, and posted
 // as its own issue comment so the round's text is never lost. A finding with a credential-shaped body
 // is dropped outright. `journal` (optional: has(key), record(key, id)) lets a caller resume a
-// publish that stopped partway without posting twice (OBJ-006).
+// publish that stopped partway without posting twice.
 // Every comment a round posts ends in the engine marker, so a caller stub can divert it from the
-// pull request's concurrency group whoever posted it (OBJ-020). `engineDropped` counts findings
-// the runner itself discarded before they became events (OBJ-005).
+// pull request's concurrency group whoever posted it. `engineDropped` counts findings
+// the runner itself discarded before they became events.
 // An engine's own "generated with" credit is not part of the review; the marker says whose it is.
 // Claude Code appended one to a real summary despite its attribution setting.
 export function withoutEngineCredit(body) {
@@ -151,7 +151,7 @@ export async function postRound({ fetch: fetchImpl, token, appLogin, job, events
       out.inline += 1;
       continue;
     }
-    // Already delivered as a fallback comment on an earlier attempt (OBJ-006).
+    // Already delivered as a fallback comment on an earlier attempt.
     if (journal?.has(`unplaced:${i}`)) {
       out.refused += 1;
       unplaced.push({ f, i });

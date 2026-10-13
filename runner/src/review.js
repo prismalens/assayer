@@ -157,7 +157,7 @@ export function livenessRecords(comments) {
 }
 
 // A head already reviewed by this engine, vouched for by an App or by someone who can write
-// here, is not run again unless asked (OBJ-001). Association is not write access, so a person
+// here, is not run again unless asked. Association is not write access, so a person
 // is checked through `canWrite(login)`, the effective permission. Returns the blocking record.
 export function priorReview(records, { headSha, engine, canWrite }) {
   return records.find((r) => r.reviewed && r.sha === headSha && r.engine === engine && (r.bot || canWrite(r.login))) ?? null;
@@ -238,7 +238,7 @@ async function publishOnce(dir, { log = (s) => process.stderr.write(s + '\n'), f
   const events = readFileSync(path.join(dir, 'events.jsonl'), 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l));
   const finished = events.findLast((e) => e.type === 'finished');
   // A round that did not complete has nothing to stand on; posting its liveness would
-  // overwrite a standing verdict with a failure (principle 14, OBJ-004).
+  // overwrite a standing verdict with a failure.
   if (finished?.conclusion !== 'completed') throw new Error(`the round ended ${finished?.conclusion ?? 'without finishing'}; nothing to publish`);
   token ??= gh(['auth', 'token']).trim();
   // The login the comments will carry is the token's own, not whichever account gh has active.
@@ -479,7 +479,7 @@ export async function review(o, { log = (s) => process.stderr.write(s + '\n') } 
   }, { log }));
   printRound(dir);
   if (summary.conclusion !== 'completed') return { dir, summary, posted: null };
-  // A withheld finding's severity is unknown, so it counts at every level (adversary OBJ-027).
+  // A withheld finding's severity is unknown, so it counts at every level.
   const blocking = atOrAbove(readFindings(dir).findings, o.failOn) + (o.failOn ? withheldCount(summary) : 0);
   if (!o.post) { log(`assayer: not posted; run \`${SELF} publish ${path.basename(dir)}\` to post it`); return { dir, summary, posted: null, blocking }; }
   return { dir, summary, posted: await publish(dir, { log, token }), blocking };

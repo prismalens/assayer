@@ -17,7 +17,7 @@ export const CODEX_DENY = Object.freeze(Object.fromEntries([
 ].map((p) => [p, 'deny'])));
 
 // The user's Codex config, read with a TOML parser: quoted keys, inline tables and comments are all
-// valid there, and a regex missed them (adversary OBJ-012, OBJ-018).
+// valid there, and a regex missed them.
 function codexConfig(env, file = path.join(env.CODEX_HOME || path.join(os.homedir(), '.codex'), 'config.toml')) {
   try { return { file, toml: parseToml(readFileSync(file, 'utf8')) }; } catch { return { file, toml: null }; }
 }
@@ -43,7 +43,7 @@ export function codexUserMcpServers(env = process.env, list = codexMcpList, syst
 }
 
 // Codex's own inventory. A failure is not an empty list: the round refuses to start rather than
-// run with servers it could not see (adversary OBJ-024).
+// run with servers it could not see.
 function codexMcpList(env) {
   const r = spawnSync('codex', ['mcp', 'list', '--json'], { env: { ...process.env, ...env }, encoding: 'utf8', timeout: 15_000 });
   let names = null;
@@ -149,7 +149,7 @@ export const ENGINES = Object.freeze({
     admitted: null, // prismalens#639 passes the gate; no admission record in this repo yet
     // No user settings, hooks, plugins or CLAUDE.md, and no reads outside the checkout. The adapter
     // starts in the user's own defaultMode ("auto" ran shell unasked), so the round sets Always ask
-    // and every gated call reaches the policy (planner ruling, run-plan 2026-10-13).
+    // and every gated call reaches the policy.
     sessionMeta: { claudeCode: { options: { settingSources: [], strictMcpConfig: true, settings: { permissions: { blockReadsOutsideWorkingDirectories: true }, attribution: { commit: '', pr: '' }, includeCoAuthoredBy: false } } } },
     sessionMode: 'default',
     prepare({ model, env }) {

@@ -21,7 +21,7 @@ function hookPath(cwd) {
 
 export function install(cwd = process.cwd(), found = onPath()) {
   // The hook runs `assayer` from PATH at push time, so it needs a lasting one there. onPath skips
-  // the folders npx, dlx and npm scripts put on PATH and take away again (OBJ-035, OBJ-038).
+  // the folders npx, dlx and npm scripts put on PATH and take away again.
   if (!found) throw new Error('the hook needs assayer on PATH; install it first with `npm i -g @prismalens/assayer`, then run `assayer hook install`');
   const p = hookPath(cwd);
   if (existsSync(p) && !readFileSync(p, 'utf8').includes(MARKER)) throw new Error(`${p} is another pre-push hook; assayer leaves it alone`);
@@ -44,7 +44,7 @@ export function hookMode(env = process.env, cwd = process.cwd()) {
   return MODES.includes(raw) ? { mode: raw } : { mode: 'warn', invalid: raw };
 }
 
-// Every local round's directory, wherever --out put it (adversary OBJ-030).
+// Every local round's directory, wherever --out put it.
 export const roundIndex = () => path.join(assayerHome(), 'local-rounds.jsonl');
 export function indexRound(dir, index = roundIndex()) {
   mkdirSync(path.dirname(index), { recursive: true });
@@ -53,7 +53,7 @@ export function indexRound(dir, index = roundIndex()) {
 
 // Completed local rounds, newest first. A round whose event log is missing, has a line that no
 // longer parses, lacks its finished event or holds fewer findings than its summary counted is
-// withheld: the hook cannot say it was minor (adversary OBJ-032).
+// withheld: the hook cannot say it was minor.
 export function localRounds(root = path.join(assayerHome(), 'reviews'), index = roundIndex()) {
   const dirs = new Set(existsSync(root) ? readdirSync(root).map((n) => path.join(root, n)) : []);
   if (existsSync(index)) for (const l of readFileSync(index, 'utf8').split('\n')) { try { dirs.add(path.resolve(JSON.parse(l).dir)); } catch { /* torn line */ } }
@@ -94,10 +94,10 @@ export function prePush({ lines, rounds, mode, treeOf, isAncestor }) {
     const [lref, lsha, , rsha] = line.trim().split(/\s+/);
     if (!lsha || isZero(lsha)) continue;
     const tree = treeOf(lsha);
-    // A tag or ref on a blob or tree carries no commit to review (adversary OBJ-029).
+    // A tag or ref on a blob or tree carries no commit to review.
     if (tree === null) { messages.push(`assayer: ${lref} is not a commit; nothing to review`); continue; }
     // Every review of this exact tree counts, not only the newest: the code is the same, so a later
-    // clean run does not overrule an earlier finding, and no ordering can hide one (adversary OBJ-032).
+    // clean run does not overrule an earlier finding, and no ordering can hide one.
     const matching = rounds.filter((r) => r.round.head_tree === tree && (isZero(rsha) || !rsha || isAncestor(r.round.base_sha, rsha)));
     if (!matching.length) {
       messages.push(`assayer: ${lref} at ${lsha.slice(0, 7)} has no local review. Run: ${SELF} review --head ${lsha.slice(0, 7)}${isZero(rsha) || !rsha ? '' : ` --base ${rsha.slice(0, 7)}`}`);
@@ -107,7 +107,7 @@ export function prePush({ lines, rounds, mode, treeOf, isAncestor }) {
     let flagged = false;
     for (const round of matching) {
       const serious = round.findings.filter((f) => atLeastMajor(f.body));
-      // A withheld finding's severity is unknown, so it blocks like a major one (adversary OBJ-027).
+      // A withheld finding's severity is unknown, so it blocks like a major one.
       if (round.withheld) messages.push(`assayer: ${lref}: round ${path.basename(round.dir)} withheld ${round.withheld} finding(s) Assayer could not read; see ${round.dir}`);
       if (serious.length) messages.push(`assayer: ${lref} has ${serious.length} major or critical finding(s) from round ${path.basename(round.dir)}:`);
       for (const f of serious) {

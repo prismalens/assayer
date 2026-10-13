@@ -86,7 +86,7 @@ describe("poster (#184)", () => {
     assert.deepEqual(r, { inline: 1, refused: 4, summary: 1, unplaced: 3 });
   });
 
-  it("never says no findings when every finding failed to anchor, and posts each one as a comment (OBJ-005)", async () => {
+  it("never says no findings when every finding failed to anchor, and posts each one as a comment", async () => {
     const gh = github({ refuse: new Set(["src/a.js"]) });
     const r = await postRound({ fetch: gh.fetch, token: "t", appLogin: APP, job: JOB, events: stream([finding(), finding({ line: 30 })]), rounds: 1 });
     assert.deepEqual(r, { inline: 0, refused: 2, summary: 1, unplaced: 2 });
@@ -118,7 +118,7 @@ describe("poster (#184)", () => {
     assert.equal(fresh.calls.filter((c) => c.method === "POST").length, 2);
   });
 
-  it("resumes from a journal without posting a recorded finding or summary twice (OBJ-006)", async () => {
+  it("resumes from a journal without posting a recorded finding or summary twice", async () => {
     const seen = new Map([["finding:0", 11], ["summary", 12]]);
     const journal = { has: (k) => seen.has(k), record: (k, id) => seen.set(k, id) };
     const gh = github();
@@ -133,7 +133,7 @@ describe("poster (#184)", () => {
     assert.ok(seen.has("finding:1") && seen.has("liveness"));
   });
 
-  it("never @-mentions from a posted body, so a quoted summons cannot start a lane (OBJ-023)", async () => {
+  it("never @-mentions from a posted body, so a quoted summons cannot start a lane", async () => {
     assert.equal(quiet("run @claude review now"), "run @\u200dclaude review now");
     assert.equal(quiet("a@ b"), "a@ b");
     const gh = github({ refuse: new Set(["src/a.js"]) });
@@ -142,7 +142,7 @@ describe("poster (#184)", () => {
     assert.ok(gh.calls.filter((c) => c.method === "POST").every((c) => !/@claude/.test(c.body.body)));
   });
 
-  it("leaves code spans and fences byte-exact when it quiets mentions (OBJ-027)", () => {
+  it("leaves code spans and fences byte-exact when it quiets mentions", () => {
     const body = "ping @claude\n\n```suggestion\nimport x from \"@scope/pkg\";\n@decorator\n```\nand `@Inject` here";
     const q = quiet(body);
     assert.match(q, /ping @\u200dclaude/);
@@ -150,20 +150,20 @@ describe("poster (#184)", () => {
     assert.ok(q.includes("`@Inject`"));
   });
 
-  it("leaves tilde fences and multi-backtick spans byte-exact too (OBJ-027)", () => {
+  it("leaves tilde fences and multi-backtick spans byte-exact too", () => {
     assert.equal(quiet("~~~python\n@decorator\n~~~\nhey @bob"), "~~~python\n@decorator\n~~~\nhey @\u200dbob");
     assert.equal(quiet("``a ` @scope/pkg`` and @x"), "``a ` @scope/pkg`` and @\u200dx");
     assert.equal(quiet("````\n```\n@a\n````\n@b"), "````\n```\n@a\n````\n@\u200db");
   });
 
-  it("leaves indented, blockquoted and mixed-fence code byte-exact (OBJ-027)", () => {
+  it("leaves indented, blockquoted and mixed-fence code byte-exact", () => {
     assert.equal(quiet("text\n\n    @decorator\n    def f(): pass\n\n@x"), "text\n\n    @decorator\n    def f(): pass\n\n@\u200dx");
     assert.equal(quiet("> ```py\n> @decorator\n> ```\n> see @bob"), "> ```py\n> @decorator\n> ```\n> see @\u200dbob");
     assert.equal(quiet("- item\n\n  ```\n  @a\n  ```"), "- item\n\n  ```\n  @a\n  ```");
     assert.equal(quiet("```\n```~~~\n@decorator\n```\n@y"), "```\n```~~~\n@decorator\n```\n@\u200dy");
   });
 
-  it("ends every comment a round posts in the engine marker, so a stub can divert it (OBJ-020)", async () => {
+  it("ends every comment a round posts in the engine marker, so a stub can divert it", async () => {
     const gh = github({ refuse: new Set(["src/a.js"]) });
     await postRound({ fetch: gh.fetch, token: "t", appLogin: APP, job: JOB, rounds: 1, events: stream([finding()]) });
     const posts = gh.calls.filter((c) => c.method === "POST");
@@ -171,7 +171,7 @@ describe("poster (#184)", () => {
     assert.ok(posts.every((c) => c.body.body.endsWith("<!-- assayer-finding engine=opencode -->")));
   });
 
-  it("does not retry inline a finding already delivered as a fallback (OBJ-006)", async () => {
+  it("does not retry inline a finding already delivered as a fallback", async () => {
     const seen = new Map([["unplaced:0", 5]]);
     const journal = { has: (k) => seen.has(k), record: (k, id) => seen.set(k, id) };
     const gh = github();
@@ -179,7 +179,7 @@ describe("poster (#184)", () => {
     assert.ok(gh.calls.every((c) => !c.path.endsWith("/pulls/183/comments")));
   });
 
-  it("checks the head after the liveness lookup and writes nothing when it moved (OBJ-004)", async () => {
+  it("checks the head after the liveness lookup and writes nothing when it moved", async () => {
     const gh = github();
     const order = [];
     await postRound({ fetch: async (u, i) => { order.push(i?.method ?? "GET"); return gh.fetch(u, i); }, token: "t", appLogin: APP, job: JOB, rounds: 1,
@@ -187,19 +187,19 @@ describe("poster (#184)", () => {
     assert.deepEqual(order, ["POST", "GET", "check"]);
   });
 
-  it("counts findings the runner dropped before they became events (OBJ-005)", async () => {
+  it("counts findings the runner dropped before they became events", async () => {
     const gh = github();
     await postRound({ fetch: gh.fetch, token: "t", appLogin: APP, job: JOB, rounds: 1, events: stream([]), engineDropped: 1 });
     const live = gh.calls.filter((c) => c.method === "POST").at(-1);
     assert.match(live.body.body, /0 findings inline, 1 withheld/);
   });
 
-  it("a withheld finding is never reported as no findings (OBJ-005)", async () => {
+  it("a withheld finding is never reported as no findings", async () => {
     assert.equal(roundVerdict({ conclusion: "completed", headSha: HEAD, findings: 0, dropped: 1 }),
       "reviewed `bbbbbbb`, 0 findings inline, 1 withheld (credential-shaped, oversized or unreadable).");
   });
 
-  it("keys an unplaced finding by its place in the round, so a resume posts the right one (OBJ-006)", async () => {
+  it("keys an unplaced finding by its place in the round, so a resume posts the right one", async () => {
     const seen = new Map([["unplaced:0", 1]]);
     const journal = { has: (k) => seen.has(k), record: (k, id) => seen.set(k, id) };
     const gh = github({ refuse: new Set(["src/a.js"]) });
@@ -210,7 +210,7 @@ describe("poster (#184)", () => {
     assert.ok(seen.has("unplaced:2"));
   });
 
-  it("keeps one liveness line per engine when asked, so one engine never erases another's (OBJ-001)", async () => {
+  it("keeps one liveness line per engine when asked, so one engine never erases another's", async () => {
     const codex = { id: 9, user: { login: APP }, body: `${LIVENESS_PREFIX} rounds=1 sha=${HEAD} engine=codex -->\nx` };
     const gh = github({ comments: [codex] });
     await upsertLiveness({ fetch: gh.fetch, token: "t", appLogin: APP, repository: JOB.repository, prNumber: 183, body: "y", engine: "opencode" });
