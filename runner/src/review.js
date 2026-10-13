@@ -25,29 +25,29 @@ import { KEYS, SELF, assayerHome, formatSettings, readSettings, resolveDefaults,
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const USAGE = `usage:
-  assayer review <owner/repo#N | PR URL> [--engine E] [--model M] [--post] [--again]
+  ${SELF} review <owner/repo#N | PR URL> [--engine E] [--model M] [--post] [--again]
                  [--fail-on critical|major|minor] [--full] [--ignore-repo-config] [--out DIR]
-  assayer review [--base REF] [--head REV] [--engine E] [--model M]
+  ${SELF} review [--base REF] [--head REV] [--engine E] [--model M]
                  [--fail-on critical|major|minor] [--ignore-repo-config] [--out DIR]
                                                          reviews local changes, prints only
-  assayer config [set <key> <value> | unset <key>]       engine, model, fail-on defaults
-  assayer hook install|uninstall
-  assayer publish <round dir or name>
-  assayer telemetry on|off|status
-  assayer doctor
-  assayer --version`;
+  ${SELF} config [set <key> <value> | unset <key>]       engine, model, fail-on defaults
+  ${SELF} hook install|uninstall
+  ${SELF} publish <round dir or name>
+  ${SELF} telemetry on|off|status
+  ${SELF} doctor
+  ${SELF} --version`;
 
 
-export const HELP = `assayer: code review on your machine, with your own engine sign-in, posted as you.
+export const HELP = `${SELF}: code review on your machine, with your own engine sign-in, posted as you.
 
 ${USAGE.replace(/^usage:\n/, 'Usage:\n')}
 
 Examples:
-  assayer review owner/repo#123             review a pull request and print the findings
-  assayer review owner/repo#123 --post      post them inline on the pull request, as you
-  assayer review                            review your uncommitted work before you push
-  assayer doctor                            check what this machine has for a round
-  assayer config set engine claude-code     change your default engine (codex, claude-code, opencode)
+  ${SELF} review owner/repo#123             review a pull request and print the findings
+  ${SELF} review owner/repo#123 --post      post them inline on the pull request, as you
+  ${SELF} review                            review your uncommitted work before you push
+  ${SELF} doctor                            check what this machine has for a round
+  ${SELF} config set engine claude-code     change your default engine (codex, claude-code, opencode)
 
 The first review asks which engine to use and can install it. Rounds are kept in ~/.assayer/reviews.
 Docs: https://github.com/prismalens/assayer#readme`;
@@ -325,7 +325,7 @@ export function failureLines(s, dir = null) {
   }
   if (s.conclusion === 'timed-out') {
     out.push(s.timed_out_by === 'stalled'
-      ? `  a subagent stopped making progress, most likely waiting on the model's provider; run it again, or pick another model with --model`
+      ? `  the engine went quiet with a subagent still open until the time limit, most likely waiting on the model's provider; run it again, or pick another model with --model`
       : `  the engine went quiet or ran past its time limit (${s.timed_out_by ?? 'timeout'})`);
   }
   if (!out.length && s.conclusion !== 'completed' && !s.refused_size) out.push(`  no reason recorded; the engine's own log is ${path.join('<round dir>', 'engine-stderr.log')}`);

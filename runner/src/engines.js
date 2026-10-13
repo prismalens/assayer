@@ -1,7 +1,7 @@
 // The engine registry: what to spawn and how it takes its model and credential. Every row is
 // an ACP agent on stdio. A row enters only after an admission run passes; `admitted` records it.
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { parse as parseToml, stringify as stringifyToml } from 'smol-toml';
 import os from 'node:os';
 import path from 'node:path';
@@ -75,13 +75,6 @@ export const ENGINES = Object.freeze({
     // --pure: no user plugins or global config; --cwd pins the project. Mirrors the prismalens
     // registry row that passed the #561 admission run.
     args: ({ cwd }) => ['acp', '--pure', '--cwd', cwd],
-    // Every streamed part, a subagent's too, lands in this store; its write time is the engine's
-    // last activity. Null when it cannot be read, so the round keeps waiting rather than guessing.
-    activity: (env) => {
-      const dir = path.join(env.XDG_DATA_HOME || path.join(env.HOME || os.homedir(), '.local', 'share'), 'opencode');
-      const times = ['opencode.db-wal', 'opencode.db'].map((f) => { try { return statSync(path.join(dir, f)).mtimeMs; } catch { return 0; } });
-      return Math.max(...times) || null;
-    },
     envAllow: [...BASE_ENV, 'GH_TOKEN', 'GITHUB_TOKEN', 'XDG_DATA_HOME', 'XDG_CACHE_HOME'],
     credentialKinds: ['api-key', 'user-login'],
     admitted: { version: '1.18.30', by: 'prismalens#561' },

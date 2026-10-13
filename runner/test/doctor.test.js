@@ -19,7 +19,7 @@ describe('doctor', () => {
     assert.equal(d.ok, true);
     assert.equal(d.checks.find((c) => c.name === 'engine codex').detail, 'codex 0.162.1');
     assert.match(d.checks.find((c) => c.name === 'engine claude-code').detail, /missing claude and claude-agent-acp/);
-    assert.match(formatDoctor(d), /ready: assayer review can run here/);
+    assert.match(formatDoctor(d), /ready: (npx @prismalens\/)?assayer review can run here/);
   });
 
   it('is not ready without an adapter, without gh sign-in, or on an old Node', () => {

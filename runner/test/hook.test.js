@@ -108,6 +108,7 @@ describe('pre-push hook', () => {
       'Critical, torn finished': [`${crit}\n{"type":"finished","at":`, 1],
       'missing log': [null, 1],
       'clean but no finished': ['', 0],
+      'a null line': [`null\n${crit}`, 1],
     };
     for (const [name, [log, count]] of Object.entries(cases)) {
       const root = tmp();
@@ -120,6 +121,16 @@ describe('pre-push hook', () => {
       save(path.join(root, 'old-clean'), JSON.stringify({ type: 'finished', at: '2026-10-01T00:00:00Z' }), 0);
       save(path.join(root, 'damaged'), log, count);
       assert.equal(run(line, localRounds(root, path.join(root, 'none.jsonl')), 'block').code, 1, name);
+    }
+    // The summary lost or torn after a round that recorded its own completion.
+    for (const summary of [null, '{"conclusion":']) {
+      const root = tmp(); const d = path.join(root, 'r'); mkdirSync(d);
+      writeFileSync(path.join(d, 'round.json'), JSON.stringify({ mode: 'local', head_tree: 'T', base_sha: 'b'.repeat(40) }));
+      writeFileSync(path.join(d, 'events.jsonl'), `${crit}\n${JSON.stringify({ type: 'finished', at: '2026-10-01T00:10:00Z', conclusion: 'completed' })}`);
+      if (summary !== null) writeFileSync(path.join(d, 'summary.json'), summary);
+      const rounds = localRounds(root, path.join(root, 'none.jsonl'));
+      assert.equal(rounds.length, 1, String(summary));
+      assert.equal(run(line, rounds, 'block').code, 1, String(summary));
     }
   });
 

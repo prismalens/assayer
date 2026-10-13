@@ -60,13 +60,20 @@ export function localRounds(root = path.join(assayerHome(), 'reviews'), index = 
   for (const dir of dirs) {
     try {
       const round = JSON.parse(readFileSync(path.join(dir, 'round.json'), 'utf8'));
-      const summary = JSON.parse(readFileSync(path.join(dir, 'summary.json'), 'utf8'));
-      if (round.mode !== 'local' || summary.conclusion !== 'completed') continue;
-      let broken = 0; let text = '';
+      if (round?.mode !== 'local') continue;
+      let broken = 0; let text = ''; let summary = null;
       try { text = readFileSync(path.join(dir, 'events.jsonl'), 'utf8'); } catch { broken += 1; }
-      const events = text.split('\n').filter(Boolean).flatMap((l) => { try { return [JSON.parse(l)]; } catch { broken += 1; return []; } });
+      const events = text.split('\n').filter(Boolean).flatMap((l) => {
+        try { const e = JSON.parse(l); if (e && typeof e === 'object') return [e]; } catch { /* counted below */ }
+        broken += 1; return [];
+      });
+      const end = events.find((e) => e.type === 'finished');
+      // Either record can say the round completed; a lost or torn summary is damage, not "unfinished".
+      try { summary = JSON.parse(readFileSync(path.join(dir, 'summary.json'), 'utf8')); } catch { broken += 1; }
+      if ((summary?.conclusion ?? end?.conclusion) !== 'completed') continue;
+      summary ??= {};
       const findings = events.filter((e) => e.type === 'finding');
-      const finished = Date.parse(events.find((e) => e.type === 'finished')?.at ?? '');
+      const finished = Date.parse(end?.at ?? '');
       if (Number.isNaN(finished)) broken += 1;
       const missing = Math.max(0, (Number.isInteger(summary.findings) ? summary.findings : 0) - findings.length);
       out.push({ dir, round, findings, withheld: withheldCount(summary) + missing + broken, mtime: Number.isNaN(finished) ? 0 : finished });

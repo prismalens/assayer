@@ -5,6 +5,7 @@ import { spawnSync } from 'node:child_process';
 import { accessSync, constants } from 'node:fs';
 import path from 'node:path';
 import { ENGINES, codexSandboxModeSet, installArgs } from './engines.js';
+import { SELF } from './settings.js';
 
 const MIN_NODE = 24;
 
@@ -57,6 +58,6 @@ export function doctor({ probe = defaultProbe, which = onPath, nodeVersion = pro
 
 export function formatDoctor({ ok, checks }) {
   const lines = checks.map((c) => `${c.ok ? 'ok     ' : c.required ? 'missing' : '-      '}  ${c.name.padEnd(20)} ${c.detail}`);
-  lines.push('', ok ? 'ready: assayer review can run here' : 'not ready: fix the missing lines above; at least one engine is needed');
+  lines.push('', ok ? `ready: ${SELF} review can run here` : 'not ready: fix the missing lines above; at least one engine is needed');
   return lines.join('\n');
 }

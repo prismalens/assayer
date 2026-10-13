@@ -41,17 +41,24 @@ export function startProgress(dir, { engine, stream = process.stderr, now = Date
   const started = now();
   const raw = tail(path.join(dir, 'raw.jsonl'));
   const tools = tail(path.join(dir, 'tool-log.jsonl'));
-  let calls = 0; let filed = 0; let frame = 0;
+  let calls = 0; let filed = 0; let frame = 0; let last = started;
   const clock = () => { const s = Math.floor((now() - started) / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
   const tick = () => {
-    for (const e of raw()) if (e.kind === 'update' && e.notification?.update?.sessionUpdate === 'tool_call') calls += 1;
+    for (const e of raw()) {
+      if (e.kind !== 'update') continue;
+      last = now();
+      if (e.notification?.update?.sessionUpdate === 'tool_call') calls += 1;
+    }
     const out = [];
     for (const e of tools()) {
       if (e.tool !== 'create_inline_comment') continue;
       const line = findingLine(e);
       if (line) { filed += 1; out.push(line); }
     }
-    const status = `${FRAMES[frame++ % FRAMES.length]} ${engine} reviewing · ${clock()} · ${calls} tool call${calls === 1 ? '' : 's'} · ${filed} filed`;
+    // A stalled provider looks like slow work from here; say how long it has been quiet.
+    const quiet = Math.floor((now() - last) / 1000);
+    const hush = quiet >= 120 ? ` · quiet ${Math.floor(quiet / 60)}m, Ctrl-C stops it` : '';
+    const status = `${FRAMES[frame++ % FRAMES.length]} ${engine} reviewing · ${clock()} · ${calls} tool call${calls === 1 ? '' : 's'} · ${filed} filed${hush}`;
     stream.write(`\r\x1b[2K${out.map((l) => l + '\n').join('')}\x1b[2m${status.slice(0, (stream.columns ?? 120) - 1)}\x1b[0m`);
   };
   const timer = setInterval(tick, every);

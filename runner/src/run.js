@@ -153,6 +153,7 @@ export async function runRound(opts, { log = (s) => process.stderr.write(s + '\n
   // A subagent's work sends the parent no updates; an open tool call is activity, not idleness.
   // The wall clock still bounds the round (a free model's subagents ran past 8 quiet minutes).
   const open = new Set();
+  let lastUpdate = Date.now();
   const track = (u) => {
     if (!u?.toolCallId || (u.sessionUpdate !== 'tool_call' && u.sessionUpdate !== 'tool_call_update')) return;
     if (u.status === 'completed' || u.status === 'failed') open.delete(u.toolCallId);
@@ -184,14 +185,12 @@ export async function runRound(opts, { log = (s) => process.stderr.write(s + '\n
         try { ctx.notify?.(acp.methods.agent.session.cancel, { sessionId: mapper.sessionId }); } catch { /* fall through to kill */ }
         setTimeout(() => child.kill('SIGKILL'), 5000).unref();
       };
-      timer = setTimeout(() => cancel('wall-clock'), opts.timeoutMs);
-      // An engine that reports its own activity (OpenCode's session store) defers only while it
-      // moves: a subagent waiting on a stalled provider held a round 15 minutes (run-plan 2026-10-13).
+      // No outside signal tells a slow subagent from one whose provider stalled (adversary OBJ-033,
+      // OBJ-034), so an open one waits for the wall clock, which then names the quiet stall.
+      timer = setTimeout(() => cancel(open.size && Date.now() - lastUpdate >= opts.idleMs ? 'stalled' : 'wall-clock'), opts.timeoutMs);
       const onIdle = () => {
-        const last = row.activity?.(env) ?? null;
-        const moving = last === null || Date.now() - last < opts.idleMs;
-        if (open.size && moving) { raw('idle_deferred', { open: open.size, activity_at: last && new Date(last).toISOString() }); idle = setTimeout(onIdle, opts.idleMs); return; }
-        cancel(open.size ? 'stalled' : 'idle');
+        if (open.size) { raw('idle_deferred', { open: open.size }); idle = setTimeout(onIdle, opts.idleMs); return; }
+        cancel('idle');
       };
       idle = setTimeout(onIdle, opts.idleMs);
       const init = await ctx.request(acp.methods.agent.initialize, { protocolVersion: acp.PROTOCOL_VERSION, clientCapabilities: {} });
@@ -219,7 +218,7 @@ export async function runRound(opts, { log = (s) => process.stderr.write(s + '\n
             if (m.kind === 'stop') { raw('stop', { response: m.response }); mapper.onStop(m.response); return m.response; }
             const n = m.notification ?? m.update ?? m;
             raw('update', { notification: n });
-            track(n.update ?? n);
+            track(n.update ?? n); lastUpdate = Date.now();
             clearTimeout(idle); idle = setTimeout(onIdle, opts.idleMs);
             mapper.onUpdate(n.update ?? n);
           }
