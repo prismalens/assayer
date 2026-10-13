@@ -117,6 +117,7 @@ export async function runRound(opts, { log = (s) => process.stderr.write(s + '\n
     log('assayer-run: the manifest refused this pull request by size; no engine started');
     return summary;
   }
+  row.sealCheckout?.(cwd, process.env);
   const source = opts.engineGh === 'offline' ? Object.fromEntries(Object.entries(process.env).filter(([k]) => k !== 'GH_TOKEN' && k !== 'GITHUB_TOKEN')) : process.env;
   const baseEnv = engineEnv(row, source, opts.credentialEnv ? [opts.credentialEnv] : []);
   // The engine's `gh` is the shim: `pr comment` is recorded, never posted. Story: #184 day one.

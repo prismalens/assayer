@@ -1,6 +1,6 @@
 // The engine registry: what to spawn and how it takes its model and credential. Every row is
 // an ACP agent on stdio. A row enters only after an admission run passes; `admitted` records it.
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -19,6 +19,30 @@ export const CODEX_DENY = Object.freeze(Object.fromEntries([
 export function codexSandboxModeSet(env = process.env) {
   const file = path.join(env.CODEX_HOME || path.join(os.homedir(), '.codex'), 'config.toml');
   try { return /^\s*sandbox_mode\s*=/m.test(readFileSync(file, 'utf8')) ? file : null; } catch { return null; }
+}
+
+// The user's own MCP servers: a real round's Codex called the user's Notion tools unasked.
+export function codexUserMcpServers(env = process.env) {
+  const file = path.join(env.CODEX_HOME || path.join(os.homedir(), '.codex'), 'config.toml');
+  let text = '';
+  try { text = readFileSync(file, 'utf8'); } catch { return []; }
+  const names = new Set();
+  for (const m of text.matchAll(/^\s*\[mcp_servers\.("?)([^"\].]+)\1(?:\.[^\]]+)?\]\s*$/gm)) names.add(m[2]);
+  for (const m of text.matchAll(/^\s*mcp_servers\.("?)([^"=.\s]+)\1\./gm)) names.add(m[2]);
+  return [...names];
+}
+
+// Codex loads a trusted project's .codex/config.toml, and codex-acp trusts the checkout, so a pull
+// request could configure the engine reviewing it. The checkout's .codex/ and .agents/ (skills) are
+// replaced before the engine starts; the review still sees them in the staged diff. The written
+// config switches off the user's own MCP servers, which no thread-level override reached.
+export function sealCodexCheckout(cwd, env = process.env) {
+  rmSync(path.join(cwd, '.codex'), { recursive: true, force: true });
+  rmSync(path.join(cwd, '.agents'), { recursive: true, force: true });
+  const servers = codexUserMcpServers(env).filter((n) => /^[\w-]+$/.test(n));
+  mkdirSync(path.join(cwd, '.codex'), { recursive: true });
+  writeFileSync(path.join(cwd, '.codex', 'config.toml'), servers.map((n) => `[mcp_servers.${n}]\nenabled = false\n`).join('\n'));
+  return servers;
 }
 
 export const ENGINES = Object.freeze({
@@ -78,11 +102,14 @@ export const ENGINES = Object.freeze({
     // The adapter's default mode writes the workspace with an automatic reviewer. read-only puts
     // Codex's own sandbox around every command and asks the runner before leaving it. The
     // sign-in stays in the user's CODEX_HOME: a copied auth.json forks the rotating refresh token.
+    sealCheckout: sealCodexCheckout,
     prepare({ model, env }) {
       return {
         ...env, INITIAL_AGENT_MODE: 'read-only', NO_BROWSER: '1',
         CODEX_CONFIG: JSON.stringify({
-          web_search: 'disabled', project_doc_max_bytes: 0, model_reasoning_effort: 'xhigh', features: { plugins: false }, ...(model ? { model } : {}),
+          web_search: 'disabled', project_doc_max_bytes: 0, model_reasoning_effort: 'xhigh', ...(model ? { model } : {}),
+          // A real round tried Codex's own GitHub app to post its summary; no app, browser or computer use.
+          features: { plugins: false, apps: false, browser_use: false, browser_use_external: false, computer_use: false },
           default_permissions: 'assayer', permissions: { assayer: { filesystem: { glob_scan_max_depth: 3, ':minimal': 'read', ':workspace_roots': 'read', ...CODEX_DENY } } },
         }),
       };

@@ -13,7 +13,7 @@ title: How it works
 
 ## What the engine can read
 
-The engine runs as your user. Where the engine has a control for it, Assayer keeps the engine in the review's checkout; it adds no sandbox of its own. A symlink in the reviewed tree checks out as a plain file holding its target, so no engine can follow one out of the checkout.
+The engine runs as your user. Where the engine has a control for it, Assayer keeps the engine in the review's checkout; it adds no sandbox of its own. A symlink in the reviewed tree checks out as a plain file holding its target, so no engine can follow one out of the checkout. A pull request's own engine configuration (`.codex/` and `.agents/`) is replaced in the review's checkout, so it cannot configure the engine that reviews it, and your own MCP servers are switched off for Codex rounds; the review still reads those files in the diff.
 
 | Engine | Files outside the checkout | Network |
 |---|---|---|
