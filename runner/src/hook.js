@@ -1,7 +1,7 @@
 // `assayer hook`: an opt-in pre-push hook that never starts a round. A round takes minutes, and
 // a hook that slow gets bypassed, so the hook only reads what `assayer review` already found
 // for the tree being pushed. It warns by default, blocks only when asked, and fails open.
-import { existsSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync, chmodSync, mkdirSync } from 'node:fs';
+import { appendFileSync, existsSync, readFileSync, readdirSync, rmSync, writeFileSync, chmodSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { git, isZero, severityOf, withheldCount } from './local.js';
 import { assayerHome } from './settings.js';
@@ -41,19 +41,31 @@ export function hookMode(env = process.env, cwd = process.cwd()) {
   return MODES.includes(raw) ? { mode: raw } : { mode: 'warn', invalid: raw };
 }
 
-// Completed local rounds, newest first, with what the hook needs to match and report them.
-export function localRounds(root = path.join(assayerHome(), 'reviews')) {
-  if (!existsSync(root)) return [];
+// Every local round's directory, wherever --out put it (adversary OBJ-030).
+export const roundIndex = () => path.join(assayerHome(), 'local-rounds.jsonl');
+export function indexRound(dir, index = roundIndex()) {
+  mkdirSync(path.dirname(index), { recursive: true });
+  appendFileSync(index, JSON.stringify({ dir }) + '\n');
+}
+
+// Completed local rounds, newest first by the recorded finish time (adversary OBJ-028, OBJ-031).
+// A finding line that no longer parses, or fewer findings than the summary counted, is withheld:
+// the hook cannot say it was minor (adversary OBJ-032).
+export function localRounds(root = path.join(assayerHome(), 'reviews'), index = roundIndex()) {
+  const dirs = new Set(existsSync(root) ? readdirSync(root).map((n) => path.join(root, n)) : []);
+  if (existsSync(index)) for (const l of readFileSync(index, 'utf8').split('\n')) { try { dirs.add(path.resolve(JSON.parse(l).dir)); } catch { /* torn line */ } }
   const out = [];
-  for (const name of readdirSync(root)) {
-    const dir = path.join(root, name);
+  for (const dir of dirs) {
     try {
       const round = JSON.parse(readFileSync(path.join(dir, 'round.json'), 'utf8'));
       const summary = JSON.parse(readFileSync(path.join(dir, 'summary.json'), 'utf8'));
       if (round.mode !== 'local' || summary.conclusion !== 'completed') continue;
-      const findings = readFileSync(path.join(dir, 'events.jsonl'), 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)).filter((e) => e.type === 'finding');
-      // Ordered by when the round finished, not its name: an --out name has no timestamp (adversary OBJ-028).
-      out.push({ dir, round, findings, withheld: withheldCount(summary), mtime: statSync(path.join(dir, 'summary.json')).mtimeMs });
+      let broken = 0;
+      const events = readFileSync(path.join(dir, 'events.jsonl'), 'utf8').split('\n').filter(Boolean).flatMap((l) => { try { return [JSON.parse(l)]; } catch { broken += 1; return []; } });
+      const findings = events.filter((e) => e.type === 'finding');
+      const finished = Date.parse(events.find((e) => e.type === 'finished')?.at ?? '');
+      const missing = Math.max(0, (Number.isInteger(summary.findings) ? summary.findings : 0) - findings.length);
+      out.push({ dir, round, findings, withheld: withheldCount(summary) + missing + broken, mtime: Number.isNaN(finished) ? 0 : finished });
     } catch { /* an unfinished or foreign directory */ }
   }
   return out.sort((a, b) => b.mtime - a.mtime);
@@ -70,6 +82,8 @@ export function prePush({ lines, rounds, mode, treeOf, isAncestor }) {
     const [lref, lsha, , rsha] = line.trim().split(/\s+/);
     if (!lsha || isZero(lsha)) continue;
     const tree = treeOf(lsha);
+    // A tag or ref on a blob or tree carries no commit to review (adversary OBJ-029).
+    if (tree === null) { messages.push(`assayer: ${lref} is not a commit; nothing to review`); continue; }
     const round = rounds.find((r) => r.round.head_tree === tree && (isZero(rsha) || !rsha || isAncestor(r.round.base_sha, rsha)));
     if (!round) {
       messages.push(`assayer: ${lref} at ${lsha.slice(0, 7)} has no local review. Run: assayer review --head ${lsha.slice(0, 7)}${isZero(rsha) || !rsha ? '' : ` --base ${rsha.slice(0, 7)}`}`);
@@ -104,7 +118,7 @@ export function hookCommand({ action }, { cwd = process.cwd(), env = process.env
     if (invalid) process.stderr.write(`assayer: assayer.prepush=${invalid} is not off, warn or block; using warn\n`);
     const r = prePush({
       lines: stdin().split('\n').filter(Boolean), rounds: localRounds(), mode,
-      treeOf: (sha) => git(cwd, ['rev-parse', `${sha}^{tree}`]),
+      treeOf: (sha) => (git(cwd, ['rev-parse', '--verify', '--quiet', `${sha}^{commit}`], { allowFail: true }) ? git(cwd, ['rev-parse', `${sha}^{tree}`]) : null),
       isAncestor: (a, b) => git(cwd, ['merge-base', '--is-ancestor', a, b], { allowFail: true }) !== null,
     });
     for (const m of r.messages) process.stderr.write(m + '\n');

@@ -18,7 +18,7 @@ import { LIVENESS_PREFIX, postRound, withoutEngineCredit } from './poster.js';
 import { changedFiles, chooseBase, localCheckout, refusal as localRefusal, repoTop, sameTree, severityOf, snapshot, withheldCount, git as localGit } from './local.js';
 
 export { severityOf, withheldCount };
-import { hookCommand } from './hook.js';
+import { hookCommand, indexRound } from './hook.js';
 import { startProgress } from './progress.js';
 import { LABELS, missingFor, offerSetup, setupHint } from './setup.js';
 import { KEYS, assayerHome, formatSettings, readSettings, resolveDefaults, writeSetting } from './settings.js';
@@ -418,6 +418,7 @@ export async function reviewLocal(o, { log = (s) => process.stderr.write(s + '\n
   writeFileSync(path.join(dir, 'prompt.md'), prompt.text);
   const round = { mode: 'local', repository: null, pr_number: null, local_path: top, head_sha: snap.head, head_tree: snap.tree, base_sha: base.sha, base_source: base.source, dirty: snap.dirty, engine: o.engine, model: o.model, where: 'local' };
   writeFileSync(path.join(dir, 'round.json'), JSON.stringify(round, null, 2) + '\n');
+  indexRound(dir);
   log(`assayer: local changes in ${label}, ${snap.dirty ? 'working tree' : snap.head.slice(0, 7)} vs ${base.sha.slice(0, 7)} from ${base.source}, with ${o.engine}; round in ${tilde(dir)}`);
   warnCodexSandbox(o.engine, log);
   const summary = await watched(dir, o.engine, log, (log) => runRound({

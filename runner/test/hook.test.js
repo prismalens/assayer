@@ -52,22 +52,40 @@ describe('pre-push hook', () => {
     assert.match(run(line, [round([finding('🟠 Major')])], 'block').messages.at(-1), /--no-verify/);
   });
 
-  it('takes the round that finished last, whatever its directory is called (OBJ-028)', async () => {
-    const { localRounds } = await import('../src/hook.js');
+  it('finds every indexed round wherever --out put it, newest by recorded finish, and withholds damaged ones (OBJ-028, 030, 031, 032)', async () => {
+    const { localRounds, indexRound } = await import('../src/hook.js');
     const { mkdirSync, writeFileSync, utimesSync } = await import('node:fs');
-    const root = tmp();
-    const save = (name, findings, when) => {
-      const d = path.join(root, name); mkdirSync(d);
-      writeFileSync(path.join(d, 'round.json'), JSON.stringify({ mode: 'local', head_tree: 'T', base_sha: 'b'.repeat(40) }));
-      writeFileSync(path.join(d, 'events.jsonl'), findings.map((f) => JSON.stringify({ type: 'finding', ...f })).join('\n'));
-      writeFileSync(path.join(d, 'summary.json'), JSON.stringify({ conclusion: 'completed' }));
-      utimesSync(path.join(d, 'summary.json'), when, when);
+    const root = tmp(); const index = path.join(tmp(), 'local-rounds.jsonl');
+    const save = (dir, findings, at, { count = findings.length, junk = '' } = {}) => {
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(path.join(dir, 'round.json'), JSON.stringify({ mode: 'local', head_tree: 'T', base_sha: 'b'.repeat(40) }));
+      writeFileSync(path.join(dir, 'events.jsonl'), [...findings.map((f) => JSON.stringify({ type: 'finding', ...f })), junk, JSON.stringify({ type: 'finished', at })].filter(Boolean).join('\n'));
+      writeFileSync(path.join(dir, 'summary.json'), JSON.stringify({ conclusion: 'completed', findings: count }));
     };
-    save('local-x-9999999999999', [], new Date('2026-10-01T00:00:00Z'));
-    save('my-review', [finding('🔴 Critical')], new Date('2026-10-01T00:10:00Z'));
-    const rounds = localRounds(root);
-    assert.equal(path.basename(rounds[0].dir), 'my-review');
-    assert.equal(run([`refs/heads/x ${A} refs/heads/x ${R}`], rounds, 'block').code, 1);
+    const line = [`refs/heads/x ${A} refs/heads/x ${R}`];
+    save(path.join(root, 'local-x-9999999999999'), [], '2026-10-01T00:00:00Z');
+    const nested = path.join(tmp(), 'group', 'my-review');
+    save(nested, [finding('🔴 Critical')], '2026-10-01T00:10:00Z');
+    indexRound(nested, index);
+    // A restored old summary gets a new mtime; the recorded finish still orders it first-last.
+    const later = new Date('2027-01-01'); utimesSync(path.join(root, 'local-x-9999999999999', 'summary.json'), later, later);
+    let rounds = localRounds(root, index);
+    assert.equal(rounds[0].dir, nested);
+    assert.equal(run(line, rounds, 'block').code, 1);
+    // Findings the summary counted but the event log no longer holds, or a line that no longer parses.
+    save(nested, [], '2026-10-01T00:10:00Z', { count: 1 });
+    assert.equal(run(line, localRounds(root, index), 'block').code, 1);
+    save(nested, [], '2026-10-01T00:10:00Z', { count: 0, junk: '{"type":"finding",' });
+    rounds = localRounds(root, index);
+    assert.equal(rounds[0].withheld, 1);
+    assert.equal(run(line, rounds, 'block').code, 1);
+  });
+
+  it('skips a ref that is not a commit and still checks the rest of the push (OBJ-029)', () => {
+    const lines = [`refs/tags/blob ${'e'.repeat(40)} ${Z} ${Z}`, `refs/heads/x ${A} refs/heads/x ${R}`];
+    const r = prePush({ lines, rounds: [round([finding('🔴 Critical')])], mode: 'block', treeOf: (sha) => (sha === A ? 'T' : null), isAncestor: () => true });
+    assert.equal(r.code, 1);
+    assert.match(r.messages[0], /not a commit/);
   });
 
   it('blocks on a withheld finding, whose severity is unknown (OBJ-027)', () => {
