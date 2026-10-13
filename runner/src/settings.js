@@ -12,9 +12,17 @@ import { ENGINES } from './engines.js';
 export function onPath(env = process.env) {
   const ephemeral = (d) => /node_modules[\\/]\.bin[\\/]?$/.test(d) || /[\\/]xfs-[^\\/]+[\\/]?$/.test(d) || (env.BERRY_BIN_FOLDER && path.resolve(d) === path.resolve(env.BERRY_BIN_FOLDER));
   for (const dir of (env.PATH ?? '').split(path.delimiter).filter((d) => d && !ephemeral(d))) {
-    try { return realpathSync(path.join(dir, 'assayer')); } catch { /* not here */ }
+    try { return shimTarget(realpathSync(path.join(dir, 'assayer'))); } catch { /* not here */ }
   }
   return null;
+}
+// pnpm installs a shell shim, not a link; it names its script on a `cmd-shim-target=` line (OBJ-039).
+function shimTarget(file) {
+  let head = '';
+  try { head = readFileSync(file, 'utf8').slice(0, 8192); } catch { return file; }
+  const target = /^# cmd-shim-target=(.+)$/m.exec(head)?.[1];
+  if (!head.startsWith('#!') || !target) return file;
+  try { return realpathSync(target.trim()); } catch { return file; }
 }
 // The command as the user ran it. npx, pnpm dlx, yarn dlx and bunx leave no `assayer` on PATH,
 // so a hint naming it would fail; any run that is not the PATH one gets the npx form.

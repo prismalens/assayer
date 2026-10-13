@@ -20,22 +20,19 @@ const run = (lines, rounds, mode, ancestor = true) => prePush({ lines, rounds, m
 describe('pre-push hook', () => {
   it('installs, refuses a foreign hook, and uninstalls only its own', () => {
     const d = repo();
-    const p = install(d, '/bin/assayer', {});
+    const p = install(d, '/bin/assayer');
     assert.match(readFileSync(p, 'utf8'), new RegExp(MARKER));
     assert.equal(uninstall(d), p);
     assert.equal(existsSync(p), false);
     writeFileSync(p, '#!/bin/sh\necho mine\n');
-    assert.throws(() => install(d, '/bin/assayer', {}), /another pre-push hook/);
+    assert.throws(() => install(d, '/bin/assayer'), /another pre-push hook/);
     assert.throws(() => uninstall(d), /not assayer's hook/);
   });
 
   it('refuses to install from an npx run, which leaves nothing on PATH for the hook to call', () => {
     assert.throws(() => install(repo(), null), /npm i -g @prismalens\/assayer/);
-    for (const env of [{ npm_execpath: '/x/npm-cli.js' }, { BERRY_BIN_FOLDER: '/tmp/xfs-1' }]) {
-      assert.throws(() => install(repo(), '/usr/lib/assayer/review.js', env, '/tmp/_npx/1/review.js'), /not through npx or dlx/, JSON.stringify(env));
-    }
-    // An npm script whose PATH runs the global assayer (OBJ-038).
-    assert.ok(install(repo(), '/usr/lib/assayer/review.js', { npm_execpath: '/x/npm-cli.js' }, '/usr/lib/assayer/review.js'));
+    // Any lasting assayer on PATH will answer the hook, whoever runs the install.
+    assert.ok(install(repo(), '/usr/lib/assayer/review.js'));
   });
 
   it('names the command as the user ran it: the PATH one, or the npx form for any other run', async () => {
@@ -54,13 +51,16 @@ describe('pre-push hook', () => {
     const prefix = path.join(tmp(), 'global', 'bin'); (await import('node:fs')).mkdirSync(prefix, { recursive: true });
     (await import('node:fs')).symlinkSync(me, path.join(prefix, 'assayer'));
     assert.equal(onPath({ PATH: prefix }), me, 'a lasting install under TMPDIR still counts (OBJ-037)');
+    const pnpm = path.join(tmp(), 'pnpm', 'bin'); (await import('node:fs')).mkdirSync(pnpm, { recursive: true });
+    (await import('node:fs')).writeFileSync(path.join(pnpm, 'assayer'), `#!/bin/sh\nexec node "$basedir/x/review.js" "$@"\n# cmd-shim-target=${me}\n`, { mode: 0o755 });
+    assert.equal(onPath({ PATH: pnpm }), me, 'a pnpm shell shim resolves to its script (OBJ-039)');
   });
 
   it('honours core.hooksPath', () => {
     const d = repo();
     mkdirSync(path.join(d, 'hooks-here'));
     execFileSync('git', ['config', 'core.hooksPath', 'hooks-here'], { cwd: d });
-    assert.equal(install(d, '/bin/assayer', {}), path.join(d, 'hooks-here', 'pre-push'));
+    assert.equal(install(d, '/bin/assayer'), path.join(d, 'hooks-here', 'pre-push'));
   });
 
   it('reads the mode from the environment, then git config, then defaults to warn', () => {
