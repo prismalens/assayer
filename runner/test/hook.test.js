@@ -32,8 +32,10 @@ describe('pre-push hook', () => {
   it('refuses to install from an npx run, which leaves nothing on PATH for the hook to call', () => {
     assert.throws(() => install(repo(), null), /npm i -g @prismalens\/assayer/);
     for (const env of [{ npm_execpath: '/x/npm-cli.js' }, { BERRY_BIN_FOLDER: '/tmp/xfs-1' }]) {
-      assert.throws(() => install(repo(), '/usr/bin/assayer', env), /npm i -g/, JSON.stringify(env));
+      assert.throws(() => install(repo(), '/usr/lib/assayer/review.js', env, '/tmp/_npx/1/review.js'), /not through npx or dlx/, JSON.stringify(env));
     }
+    // An npm script whose PATH runs the global assayer (OBJ-038).
+    assert.ok(install(repo(), '/usr/lib/assayer/review.js', { npm_execpath: '/x/npm-cli.js' }, '/usr/lib/assayer/review.js'));
   });
 
   it('names the command as the user ran it: the PATH one, or the npx form for any other run', async () => {
@@ -49,6 +51,9 @@ describe('pre-push hook', () => {
     const xfs = path.join(tmp(), 'xfs-123'); (await import('node:fs')).mkdirSync(xfs);
     (await import('node:fs')).symlinkSync(me, path.join(xfs, 'assayer'));
     assert.equal(onPath({ PATH: xfs }), null, 'a yarn dlx wrapper folder is temporary');
+    const prefix = path.join(tmp(), 'global', 'bin'); (await import('node:fs')).mkdirSync(prefix, { recursive: true });
+    (await import('node:fs')).symlinkSync(me, path.join(prefix, 'assayer'));
+    assert.equal(onPath({ PATH: prefix }), me, 'a lasting install under TMPDIR still counts (OBJ-037)');
   });
 
   it('honours core.hooksPath', () => {

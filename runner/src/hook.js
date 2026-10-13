@@ -1,10 +1,12 @@
 // `assayer hook`: an opt-in pre-push hook that never starts a round. A round takes minutes, and
 // a hook that slow gets bypassed, so the hook only reads what `assayer review` already found
 // for the tree being pushed. It warns by default, blocks only when asked, and fails open.
-import { appendFileSync, existsSync, readFileSync, readdirSync, rmSync, writeFileSync, chmodSync, mkdirSync } from 'node:fs';
+import { appendFileSync, existsSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync, chmodSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { git, isZero, severityOf, withheldCount } from './local.js';
 import { assayerHome, onPath, SELF } from './settings.js';
+
+const realpathOf = (p) => { try { return realpathSync(p); } catch { return null; } };
 
 export const MARKER = '# assayer pre-push hook';
 const SCRIPT = `#!/bin/sh
@@ -19,10 +21,12 @@ function hookPath(cwd) {
   return path.isAbsolute(p) ? p : path.join(git(cwd, ['rev-parse', '--show-toplevel']), p);
 }
 
-export function install(cwd = process.cwd(), found = onPath(), env = process.env) {
-  // The hook runs `assayer` from PATH. A package runner (npx, pnpm and yarn dlx, bunx) sets one of
-  // these and leaves nothing there once it exits (adversary OBJ-035).
-  if (!found || env.npm_execpath || env.BERRY_BIN_FOLDER) throw new Error('the hook needs assayer on PATH; install it first with `npm i -g @prismalens/assayer`, then run `assayer hook install`');
+export function install(cwd = process.cwd(), found = onPath(), env = process.env, me = realpathOf(process.argv[1])) {
+  // The hook runs `assayer` from PATH. Under a package runner (npx, pnpm and yarn dlx, bunx) the copy
+  // running is a temporary one (OBJ-035); an npm script running the global one may install (OBJ-038).
+  const runner = env.npm_execpath || env.BERRY_BIN_FOLDER;
+  if (!found) throw new Error('the hook needs assayer on PATH; install it first with `npm i -g @prismalens/assayer`, then run `assayer hook install`');
+  if (runner && found !== me) throw new Error('run `assayer hook install` with your installed assayer, not through npx or dlx, whose copy goes away');
   const p = hookPath(cwd);
   if (existsSync(p) && !readFileSync(p, 'utf8').includes(MARKER)) throw new Error(`${p} is another pre-push hook; assayer leaves it alone`);
   mkdirSync(path.dirname(p), { recursive: true });
