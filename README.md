@@ -7,6 +7,11 @@
 ![Node 22+](https://img.shields.io/badge/node-%E2%89%A522-339933)
 ![Status: alpha](https://img.shields.io/badge/status-alpha-d9a441)
 
+> [!WARNING]
+> Assayer is **alpha**. Any 0.0.x release may change behaviour or break a
+> workflow; read the [release notes](https://github.com/prismalens/assayer/releases)
+> before you upgrade. See [VERSIONING.md](VERSIONING.md).
+
 Assayer is open source code review that runs on your machine with your own Codex, Claude Code or OpenCode sign-in. It reviews a pull request, posts its findings inline under your own GitHub login, and can review what you are about to push before you push it. There is no hosted service and no extra API key.
 
 - **Your machine, your sign-in.** The engine runs locally with the account or key you already use. Assayer stores no model key, passes the engine no GitHub credential, and only Assayer posts. The engine still runs as you: [what each engine can read](docs/how-it-works.md#what-the-engine-can-read).
