@@ -10,6 +10,10 @@ title: Assayer
 
 Assayer is open source code review that runs on your machine with your own Codex, Claude Code or OpenCode sign-in. It reviews a pull request, posts its findings inline under your own GitHub login, and can review what you are about to push before you push it. There is no hosted service and no extra API key.
 
+> **Assayer is alpha.** Any 0.0.x release may change behaviour or break a workflow; read the
+> [release notes](https://github.com/prismalens/assayer/releases) before you upgrade. See
+> [VERSIONING.md](https://github.com/prismalens/assayer/blob/main/VERSIONING.md).
+
 ```bash
 assayer doctor                          # what this machine has for a round
 assayer review owner/repo#123           # review and print
