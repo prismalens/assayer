@@ -4,7 +4,7 @@
 // Spawns python3 against a checkout with the same env vars those two steps set, then reads back
 // the .claude-review-manifest.json and .claude-review.diff the script wrote into that checkout.
 import { spawn } from 'node:child_process';
-import { existsSync, statSync, readFileSync } from 'node:fs';
+import { existsSync, statSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -70,16 +70,22 @@ export async function buildManifest({
   maxFileLines = DEFAULTS.maxFileLines,
   contextLines = DEFAULTS.contextLines,
   extraEnv = {},
+  localFiles = null,
+  baseSha = '',
 } = {}) {
   if (!cwd || !existsSync(cwd) || !statSync(cwd).isDirectory()) {
     throw new Error(`buildManifest: cwd ${JSON.stringify(cwd)} is not a directory`);
   }
-  // Same shape gh itself expects for `repos/{repo}/...`: exactly one slash, non-empty on both
-  // sides, no whitespace. Checked here so a malformed REPO never reaches a `gh api` call.
-  if (typeof repo !== 'string' || !/^[^/\s]+\/[^/\s]+$/.test(repo)) {
+  // A local round has no pull request: manifest.py's incremental path reads the file list from
+  // .claude-incremental-range.json and makes no GitHub call when REPO and PR are empty.
+  if (localFiles) {
+    writeFileSync(path.join(cwd, '.claude-incremental-range.json'), JSON.stringify({ files: localFiles }));
+    repo = ''; pr = ''; mode = 'incremental';
+  } else if (typeof repo !== 'string' || !/^[^/\s]+\/[^/\s]+$/.test(repo)) {
+    // Same shape gh expects for `repos/{repo}/...`, so a malformed REPO never reaches `gh api`.
     throw new Error(`buildManifest: repo ${JSON.stringify(repo)} must look like owner/name`);
   }
-  if (pr === undefined || pr === null || String(pr).trim() === '') {
+  if (!localFiles && (pr === undefined || pr === null || String(pr).trim() === '')) {
     throw new Error('buildManifest: pr is required');
   }
 
@@ -97,7 +103,7 @@ export async function buildManifest({
     CONTEXT_LINES: String(contextLines),
     // build_review_context()'s own env vars; see the DEFAULTS comment above for why each one
     // defaults the way it does. A caller overrides any of these through extraEnv.
-    BASE_SHA: '',
+    BASE_SHA: baseSha,
     LANGUAGE_MAP: DEFAULTS.languageMap,
     TOOL_FINDINGS: DEFAULTS.toolFindings,
     ISSUE_BYTE_BUDGET: DEFAULTS.issueByteBudget,
@@ -146,7 +152,7 @@ export async function buildManifest({
   }
 
   // The size refusal (principle 10) arrives as manifest.py's `refused=` output line, relayed
-  // to stderr outside Actions. A refused round never reaches the engine (OBJ-002).
+  // to stderr outside Actions. A refused round never reaches the engine.
   const refused = /^refused=true$/m.test(stderr);
   return { manifest, diffBytes, stderr, refused };
 }
@@ -167,7 +173,7 @@ function parseCliArgs(argv) {
   return o;
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {
   let opts;
   try { opts = parseCliArgs(process.argv.slice(2)); } catch (e) { process.stderr.write(`manifest: ${e.message}\n`); process.exit(2); }
   buildManifest({

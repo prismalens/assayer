@@ -88,3 +88,24 @@ test('an apostrophe in a single-quoted body, and a word Codex quotes in mixed st
   assert.equal(word("\"gh pr view 8 \"\"$(id)\""), false);
   assert.equal(word("\"gh pr view 8 \"'`id`'"), false);
 });
+
+test('keeps read-anywhere and code-running forms of git, rg, sed and cat refused', () => {
+  for (const c of ['git diff --output=/tmp/x', 'git -c core.pager=sh diff', 'git diff --ext-diff', 'rg --pre=sh x', 'sed -n 1w/tmp/x a.js', 'cat /home/u/.config/gh/hosts.yml']) {
+    assert.equal(commandAllowed(c), false, c);
+  }
+  assert.equal(decide({ kind: 'execute', rawInput: { command: 'git show HEAD' } }).allow, false);
+});
+
+test('a double-quoted body may escape a backtick or a dollar, and nothing else expands', () => {
+  assert.equal(commandAllowed('gh pr comment 13 --repo o/r --body "## Code review\nThe \\`getTodos\\` key costs \\$5."'), true);
+  for (const c of ['gh pr comment 13 --body "a \\`id\\` `id`"', 'gh pr comment 13 --body "\\$(id) $(id)"', 'gh pr comment 13 --body "a\\\\"; id"', 'gh pr comment 13 --body "a\\nb\\`"']) {
+    assert.equal(commandAllowed(c), false, c);
+  }
+});
+
+test("an apostrophe written the other bash way ('\\'') passes, and nothing around it expands", () => {
+  assert.equal(commandAllowed("gh pr comment 13 --repo o/r --body '## Code review\nanother user'\\''s cached response'"), true);
+  // As Codex sends it: the whole command as one double-quoted word.
+  assert.equal(decide({ kind: 'execute', rawInput: { command: "\"gh pr comment 13 --repo o/r --body '## Code review\nuser'\\\\''s page'\"" } }).allow, true);
+  for (const c of ["gh pr comment 13 --body 'a'\\''b'$(id)", "gh pr comment 13 --body 'a'\\'; id", "gh pr comment 13 --body 'a'\\''b' | sh"]) assert.equal(commandAllowed(c), false, c);
+});

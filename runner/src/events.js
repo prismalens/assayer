@@ -1,5 +1,5 @@
-// assayer/v1: the event stream every engine emits and the control plane consumes.
-// Field lists are the contract in docs/design/self-hosted-review.md section 4.
+// assayer/v1: the event stream every engine emits and the CLI reads.
+// Field lists are the contract (gh-workflows docs/design/self-hosted-review.md, section 4).
 
 export const EVENT_TYPES = Object.freeze([
   'started', 'read', 'agent', 'finding', 'summary', 'usage', 'error', 'finished',
@@ -54,7 +54,7 @@ export function classifyFailure(text) {
   if (/billing|payment|insufficient (credit|fund)|credit balance/.test(s)) return 'billing';
   if (/model.*(not found|unavailable|does not exist)|unknown model|404.*model/.test(s)) return 'model-unavailable';
   if (/too large|context length|maximum context|413|prompt is too long/.test(s)) return 'request-too-large';
-  if (/overloaded|503|502|unavailable|timed? ?out|econnreset|enotfound/.test(s)) return 'api-unavailable';
+  if (/overloaded|at capacity|503|502|unavailable|timed? ?out|econnreset|enotfound/.test(s)) return 'api-unavailable';
   return 'api-error';
 }
 
@@ -63,7 +63,7 @@ export function resetAtFrom(text) {
   return m ? m[1].trim() : null;
 }
 
-// The Worker's cooldown runs Date.parse on reset_at, so the runner hands it an ISO instant. A
+// A consumer runs Date.parse on reset_at, so the runner hands it an ISO instant. A
 // clock time ("7:37 PM") is read in the runner's timezone and rolls to tomorrow once passed; a
 // duration ("1h35m27s", "3m") counts from now. Anything else stays raw and the job fails, not waits.
 export function resetAtIso(raw, now = new Date()) {

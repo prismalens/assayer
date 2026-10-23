@@ -159,6 +159,7 @@ export class SessionMapper {
         this.dropped.push({ why: `unknown tool ${e.tool}`, at: e.at });
       }
     }
+    this.#mergeDuplicates();
     if (summary !== null) {
       this.events.push(event('summary', { header: headerOf(summary) ?? firstLine(summary), body: summary }, { source: summarySource, writes: summaryCount }));
     } else if (this.agentText.length) {
@@ -166,6 +167,19 @@ export class SessionMapper {
       if (body && looksLikeSecret(body)) this.dropped.push({ why: 'agent text carries a credential-shaped token; no summary' });
       else if (body) this.events.push(event('summary', { header: null, body }, { source: 'agent_text' }));
     }
+  }
+
+  // A finding filed twice, byte for byte (same file, side, range and body), posts once. Nothing
+  // looser merges: every normalisation tried also merged distinct filings.
+  #mergeDuplicates() {
+    const seen = new Map();
+    const drop = new Set();
+    this.events.forEach((e, i) => {
+      if (e.type !== 'finding' || !Number.isInteger(e.line)) return;
+      const key = JSON.stringify([e.path, e.side, e._meta?.start_line ?? null, e.line, e.body]);
+      if (seen.has(key)) { drop.add(i); this.dropped.push({ why: `identical to the finding at ${e.path}:${e.line}`, merged: true, line: e.line }); } else seen.set(key, i);
+    });
+    if (drop.size) this.events = this.events.filter((_, i) => !drop.has(i));
   }
 
   // A subagent is a tool call whose input names a subagent type (OpenCode's `task`, kind
@@ -247,3 +261,4 @@ export function readToolLog(file) {
   }
   return { entries, corrupt };
 }
+

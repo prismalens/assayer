@@ -178,7 +178,7 @@ export function promptHash(template) {
 }
 
 // The round-type tokens the workflow's build-prompt env block sets (claude-code-review.yml),
-// verbatim. scripts/render-prompt.mjs and the daemon both render through this. Re-sync with it.
+// verbatim. scripts/render-prompt.mjs and review.js both render through this. Re-sync with it.
 export function laneTokens({ repo, pr, level = 'medium', mode = 'review', rangeBase = null, rangeHead = null, pathInstructions = false }) {
   const inc = mode === 'incremental'; const full = mode === 'review-full'; const pi = pathInstructions;
   const rb = rangeBase; const rh = rangeHead;
@@ -202,11 +202,28 @@ export function laneTokens({ repo, pr, level = 'medium', mode = 'review', rangeB
 
 // The Codex template (prompt/codex.md) takes the round's two commits so the engine reads the
 // diff per file with `git diff`; it has no workflow twin and no level or mode tokens.
-export function renderCodexPrompt(template, { repo, pr, baseSha, headSha }) {
-  const tokens = { REPO: repo, PR_NUMBER: String(pr), BASE_SHA: baseSha, HEAD_SHA: headSha };
+export function renderCodexPrompt(template, { repo, pr, baseSha, headSha, local = null }) {
+  const tokens = {
+    SUBJECT: local ? `the local changes in ${local.label} that are not yet pushed` : `pull request ${repo}#${pr}`,
+    HEAD_LABEL: local ? (local.dirty ? 'a snapshot of the working tree' : 'the local head') : 'the PR head',
+    CITE_PREFIX: local ? '' : `https://github.com/${repo}/blob/${headSha}/`,
+    REPO: repo, PR_NUMBER: String(pr), BASE_SHA: baseSha, HEAD_SHA: headSha,
+  };
   let text = template;
   for (const [k, v] of Object.entries(tokens)) text = replaceAll(text, k, v);
   const left = text.match(/@@[A-Z0-9_]+@@/g);
   if (left) throw new Error(`codex prompt left a placeholder: ${left.join(' ')}`);
   return text;
+}
+
+// codex.md tells the engine to read diffs with git, which Codex runs inside its own sandbox. An
+// engine that asks first is refused git by the policy and then files nothing; it reads the
+// staged diff and the files instead. Throws if codex.md drifts from these sentences.
+const GIT_DIFF = /- Review a file's change with `git diff [0-9a-f]{7,40} [0-9a-f]{7,40} -- <path>`\./;
+const GIT_OK = 'Reading files, local `git` commands, `rg` and `gh pr view`/`gh issue view` are fine.';
+export function forFileTools(text) {
+  if (!GIT_DIFF.test(text) || !text.includes(GIT_OK)) throw new Error('codex.md no longer has the git sentences forFileTools replaces');
+  return text
+    .replace(GIT_DIFF, "- The whole change is in `.claude-review.diff` at the checkout root, as a unified diff. Read it with your file-reading tool, in line ranges if it is long.")
+    .replace(GIT_OK, 'Read files and search with your file tools. Shell commands are refused, apart from `gh pr view`/`gh issue view`; never run `git`, and never give up filing because a command was refused.');
 }

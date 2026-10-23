@@ -3,42 +3,45 @@
 Runs one review round over the [Agent Client Protocol](https://agentclientprotocol.com): spawns
 an engine, opens a session on a checkout, offers the lane's two comment tools as MCP servers,
 sends the lane's prompt, answers every permission request from the lane's tool allowlist, and
-writes the round as assayer/v1 events. The design is `docs/design/self-hosted-review.md`; this
-is its section 3.2 and 3.3, day one.
+writes the round as assayer/v1 events.
 
-`run.js` posts nothing to GitHub. The daemon ("Run the daemon" below) leases jobs from the
-control plane and holds each job's installation token only for that job. The engine's
-credential is an API key in the environment, or none for OpenCode's free models.
+`run.js` posts nothing to GitHub; only `assayer review --post` or `assayer publish` does, under
+your own `gh` login. The engine's credential is its own sign-in on this machine, an API key in
+the environment, or none for OpenCode's free models.
 
 ## Review a pull request from your terminal
 
 `assayer review owner/repo#N` runs one round on this machine with your own engine sign-in and
 prints the findings. `--post` puts them on the pull request under your own `gh` login, each
 inline finding ending in the `assayer-finding` marker; `assayer publish <dir>` posts, or resumes
-posting, a round that already ran. Nothing is hosted: a local round posts as you (#184).
+posting, a round that already ran. Nothing is hosted: a round run on your machine posts as you (#184).
 
 ```bash
-# once, from a checkout of this repository (the CLI imports ../worker/poster.js)
-(cd worker && npm ci --omit=dev) && cd runner && npm ci && npm link
-npm i -g @agentclientprotocol/codex-acp@2.1.1 && codex login    # the default engine
+# once, from a checkout of this repository
+cd runner && npm ci && npm link
+npm i -g @openai/codex@0.162.1 @agentclientprotocol/codex-acp@2.1.1 && codex login    # the default engine
 gh auth login
 
 assayer review prismalens/sreforge#183            # print only
 assayer review prismalens/sreforge#183 --post     # post as you
 ```
 
+`assayer review` with no target reviews local changes not yet pushed, against `--base` or the upstream, `origin`'s default branch, `main` or `master`. It snapshots the working tree through a temporary index into its own checkout, prints only, and exits 4 with `--fail-on critical|major|minor` when it finds that or worse. `assayer hook install|uninstall` manages an opt-in pre-push hook that reads finished local rounds and never starts one; `assayer.prepush` (`off`, `warn`, `block`) sets what it does.
+
+`assayer doctor` lists what a round needs on this machine and exits non-zero when something required is missing; `assayer --version` prints the package version. `assayer telemetry on|off|status` controls the usage counts described in the top-level README's Telemetry section.
+
 It refuses, before spending any quota, a PR that is closed, carries `claude_review_skip`, already
 has this engine's review on its head (`--again` runs another), or whose repository has a
 `.github/claude-review.yml` it cannot apply yet (#182; `--ignore-repo-config` reviews with the
 workflow defaults). The round lives in `~/.assayer/reviews/<repo>-<pr>-<sha>-<time>/` unless
-`--out` names a new directory. The engine gets no GitHub credential.
+`--out` names a new directory. Assayer passes the engine no GitHub credential.
 
 ## Run one round
 
 ```bash
 cd runner && npm ci
 node src/run.js --cwd /path/to/checkout --prompt rendered-prompt.md --out ./round-1 \
-  --engine opencode --model opencode/mimo-v2.5-free
+  --engine opencode
 ```
 
 `--cwd` must be a git checkout at the PR head. `--prompt` is the lane template already rendered.
@@ -51,8 +54,8 @@ has the template's provenance and re-sync rule. A file still carrying `@@TOKEN@@
 `src/engines.js`; `--model` defaults to the row's `defaultModel`, for OpenCode the newest free
 tool-calling model in the models.dev catalog (`opencode models opencode` lists them; the free
 tier needs no key or login). `--timeout-min` (default 20) bounds the round and `--idle-min` (default 8) cuts an engine that has sent no update for that long; either cancels the session, then kills the engine if it does not stop.
-`GH_TOKEN` in the environment is passed through to the engine for the `gh` read commands the
-prompt allows.
+Under `assayer review` the engine gets no `GH_TOKEN` or `GITHUB_TOKEN` and an empty `GH_CONFIG_DIR`,
+so its `gh` reads fail closed and only Assayer posts.
 
 Staging never executes a binary the checkout brought with it: a committed `./actionlint` or
 `node_modules/.bin/*` is skipped and the skip is recorded in the manifest's tool notes, since
@@ -77,65 +80,7 @@ The output directory holds:
 | `summary.json` | conclusion, stop reason, turns, tool calls, reads, findings, permissions allowed and rejected, usage, errors, dropped items, wall clock |
 | `engine-stderr.log`, `engine-config/`, `engine-xdg/` | the engine's own noise and the per-run config the runner wrote for it |
 
-Exit code 0 is `completed`, 3 an engine error, 4 a timeout, 2 bad usage.
-
-## Run the daemon
-
-`src/daemon.js` (bin `assayer-runner`) registers with the control plane (#196's `/runner/*`
-routes), leases jobs for its credentials, checks each pull request out with the job's
-installation token, runs one round through `run.js`, posts the round's events, revokes the token
-and posts `finished`. The engine runs as it would in a terminal on this machine: its own config
-and sign-in, or the key its credential names (prismalens ADR 0003). `--check` prints each
-credential's fingerprint and exits 0, or exits 2 naming the field on a bad file.
-
-```bash
-export ASSAYER_RUNNER_TOKEN=asr_...        # from POST /api/runners
-node src/daemon.js --config assayer-runner.json --check
-node src/daemon.js --config assayer-runner.json
-```
-
-```json
-{
-  "control_plane": "https://assayer.sfun.cloud",
-  "runner_token": "${ASSAYER_RUNNER_TOKEN}",
-  "credentials": [{ "name": "zen", "engine": "opencode", "kind": "keyless", "concurrency": 1 }]
-}
-```
-
-In a container, with the engines and staging tools at the versions `Dockerfile` pins:
-
-```bash
-docker build -t assayer-runner runner/
-docker run -it --rm -v assayer-home:/home/assayer --entrypoint claude assayer-runner   # once, for a user-login credential (codex: --entrypoint codex ... login --device-auth)
-docker run -d -v assayer-home:/home/assayer -v "$PWD/assayer-runner.json:/etc/assayer/runner.json:ro" \
-  -e ASSAYER_RUNNER_TOKEN assayer-runner
-```
-
-- Secrets never sit in the file. `runner_token` is a `${VAR}` reference, and an `api-key`
-  credential names its variable in `env`. The fingerprint the runner registers is the first 12 hex
-  of the key's SHA-256, so the key never leaves the process. A `keyless` or `user-login` one is
-  stable per host and engine.
-- `user-login` is the engine's own sign-in on this machine (`claude`, `codex login` or `opencode auth login`,
-  under `HOME`); the runner reads nothing of it. A runner may offer several credentials, each
-  with its own `concurrency`. `bedrock`, `vertex` and `foundry` are refused as deferred.
-- The checkout is a shallow fetch of the head and the base into a fresh temp dir, deleted on every
-  path. The token goes to git in `GIT_CONFIG_VALUE_0` as an extraheader, never in argv or a URL.
-- **The heartbeat** is an empty events post every `min(60, heartbeat_timeout_s / 5)` seconds.
-  Events post after the round in batches of at most 100, each event cut to 16 KiB.
-
-| Exit path | Posted before revoke | Last call |
-|---|---|---|
-| Success | the round's events | `finished{completed}` |
-| Engine failure or crash | the round's events, or a synthesized `started` + `error` | `finished{failed \| timed-out}` |
-| SIGTERM | whatever the round wrote | `finished{cancelled}` |
-| Checkout failure | `started` + `error` | `finished{failed}` |
-| Lease lost (409 or 403) | stops at the first 409 | none; the revoke still runs |
-
-`finished._meta` carries `token_revoked` and `exit`. `test/daemon.test.js` pins revoke before the
-last events call on every path.
-
-Deferred: `bedrock`, `vertex` and `foundry`, streaming events mid-round, a lease-release route (so a
-restart requeues instead of finishing `cancelled`), and incremental jobs.
+`run.js` exits 0 for `completed`, 3 for an engine error, 4 for a timeout and 2 for bad usage. `assayer review` exits 0 when the round completed, 3 when it did not, 4 when `--fail-on` found something at or above its level, 1 on a refusal and 2 on bad usage.
 
 ## What the pieces are
 
@@ -188,7 +133,7 @@ default is a workspace-write mode with an automatic reviewer. Every command runs
 own sandbox, with no writes and no network, and does not ask. A command that needs out asks, and
 the policy answers. Codex's permission request quotes such a script into one word, and the
 summary arrives as `gh pr comment --body "<lines>"`. The policy accepts a multi-line body only
-inside single quotes, or inside double quotes holding no `"`, `$`, backtick or backslash. A body
+inside single quotes, or inside double quotes whose only backslashes escape a backtick or `$`. A body
 outside that is refused, and since Codex offers only `cancel` for that request and for every
 edit, a refusal ends the round as `cancelled`, not `completed`. The probe's edit step therefore
 ends its Codex run early. Nothing lands. The row also turns off the user's Codex plugins, web
@@ -202,7 +147,7 @@ to `low` effort and cuts every tool output at 10,000 tokens, a per-model cap tha
 diff file left a 7,000-line pull request two-thirds read with no findings. The Codex template
 asks for every reviewable file, read per file with `git diff <base> <head> -- <path>`, and a
 summary that counts them. The row sets `xhigh` effort and a 90-minute, 15-idle-minute round;
-the daemon renders the template with the job's two commits. The template forbids `;`, `|`,
+the round renders the template with the pull request's two commits. The template forbids `;`, `|`,
 `--jq` and fetches because one refusal ends the round. Codex asks for an MCP call with only a
 tool-call id, so the runner merges the request with the streamed `tool_call` that named the
 server and tool, and the policy allows the two comment tools by that name. A ChatGPT usage

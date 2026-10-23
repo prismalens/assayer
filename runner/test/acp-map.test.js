@@ -166,7 +166,7 @@ test('an entry the recorder already redacted is dropped with its own reason', ()
   assert.ok(!evs.some((e) => e.type === 'summary'), 'no summary from a redacted record');
   const why = evs.at(-1)._meta.dropped.map((d) => d.why);
   assert.equal(why.filter((w) => /recorder redacted this record: credential-shaped body/.test(w)).length, 2, why.join(' | '));
-  // The publisher counts a redacted finding as withheld, so it needs the tool (OBJ-005).
+  // The publisher counts a redacted finding as withheld, so it needs the tool.
   assert.deepEqual(evs.at(-1)._meta.dropped.map((d) => d.tool), ['create_inline_comment', 'gh_pr_comment']);
 });
 
@@ -214,4 +214,50 @@ test('a Codex usage limit said as agent text, then a bare Internal error, is acc
   plain.onUpdate({ sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'Reviewing the quota code.' } });
   plain.onError(new Error('Internal error'));
   assert.equal(plain.events.find((e) => e.type === 'error').failure_class, 'api-error');
+});
+
+test('copies of one finding on neighbouring lines merge to the most severe; distinct defects there stay', async () => {
+  const { withheldCount } = await import('../src/review.js');
+  const f = (line, sev, t) => ({ tool: 'create_inline_comment', input: { path: 'src/a.ts', line, body: `_🎯 Functional Correctness_ | _${sev}_ | _⚡ Quick win_\n\n**${t}**` } });
+  const m = mk();
+  // Real titles one OpenCode round filed three times for one defect.
+  const evs = m.finish({ toolLog: [
+    f(209, '🟠 Major', 'Cache key missing userId leaks data across users'),
+    f(210, '🔴 Critical', 'Cross-user cache pollution: cache key omits userId'),
+    f(211, '🟠 Major', 'Cross-user cache leak from cache key missing userId'),
+    f(10, '🔴 Critical', 'Missing authorization check on the delete route'),
+    f(11, '🔴 Critical', 'SQL injection through the raw search query'),
+    f(12, '🟠 Major', 'Transaction is never awaited before the response'),
+  ] });
+  assert.deepEqual(evs.filter((e) => e.type === 'finding').map((e) => e.line).sort((a, b) => a - b), [10, 11, 12, 209, 210, 211], 'differently worded copies stay; a lost defect costs more');
+  assert.equal(m.dropped.filter((d) => d.merged).length, 0);
+  assert.equal(withheldCount({ dropped: m.dropped }), 0, 'merged copies are not reported as withheld');
+});
+
+test('only an identical re-filing merges; distinct defects on one or adjacent lines all stay', () => {
+  const f = (line, t) => ({ tool: 'create_inline_comment', input: { path: 'src/a.ts', line, body: `_🔒 Security & Privacy_ | _🔴 Critical_ | _⚡ Quick win_\n\n**${t}**\n\n${t} body` } });
+  const m = mk();
+  const evs = m.finish({ toolLog: [f(10, 'Cache key omits userId'), f(11, 'Cache key omits tenantId'), f(20, 'Login accepts forged tokens'), f(20, 'Login logs plaintext tokens'), f(30, 'Cache key omits userId'), f(30, 'Cache key omits userId')] });
+  assert.deepEqual(evs.filter((e) => e.type === 'finding').map((e) => e.line), [10, 11, 20, 20, 30]);
+  assert.equal(m.dropped.filter((d) => d.merged).length, 1);
+});
+
+test('same title, different body or severity: both stay, so a Critical never hides behind a Minor', async () => {
+  const { atOrAbove } = await import('../src/review.js');
+  const f = (sev, t, body, startLine) => ({ tool: 'create_inline_comment', input: { path: 'src/a.ts', line: 30, startLine, body: `_🔒 Security & Privacy_ | _${sev}_ | _⚡ Quick win_\n\n**${t}**\n\n${body}` } });
+  const m = mk();
+  const evs = m.finish({ toolLog: [
+    f('🟡 Minor', 'Log omits IP', 'The audit line has no client IP.'),
+    f('🔴 Critical', 'Log omits ID', 'Any user can read another user\'s rows.'),
+    f('🟡 Minor', 'Cache key omits userId', 'Same text.'),
+    f('🔴 Critical', 'Cache key omits userId', 'Same text.'),
+    f('🟡 Minor', 'Range', 'Same.', 20),
+    f('🟡 Minor', 'Range', 'Same.', 25),
+  ] });
+  const found = evs.filter((e) => e.type === 'finding');
+  assert.equal(found.length, 6);
+  // Bodies equal only after whitespace folding stay apart: one reads Critical, one unreadable.
+  const w = mk().finish({ toolLog: [f('🔴 Critical', 'Same', 'x'), { tool: 'create_inline_comment', input: { path: 'src/a.ts', line: 30, body: '\n' + f('🔴 Critical', 'Same', 'x').input.body } }] });
+  assert.equal(w.filter((e) => e.type === 'finding').length, 2);
+  assert.equal(atOrAbove(found, 'critical'), 2);
 });

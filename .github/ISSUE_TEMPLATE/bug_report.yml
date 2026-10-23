@@ -1,0 +1,68 @@
+name: Bug report
+description: Assayer behaves incorrectly.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for filing a bug. Issues are public, so remove tokens, keys,
+        connection strings and private code from anything you paste.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What you saw, and what you expected instead.
+      placeholder: I ran assayer review owner/repo#123 and ...
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: The actions or commands, in order.
+      placeholder: |
+        1. assayer review owner/repo#123
+        2. ...
+        3. see error
+    validations:
+      required: true
+  - type: input
+    id: command
+    attributes:
+      label: Command run
+      description: The exact command line you executed.
+      placeholder: assayer review owner/repo#123 --post
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Assayer version
+      description: "`npm ls -g @prismalens/assayer`, or the commit of your checkout"
+      placeholder: 0.0.1
+    validations:
+      required: true
+  - type: input
+    id: engine
+    attributes:
+      label: Engine and model
+      description: The engine used (Codex, Claude Code, OpenCode) and model version.
+      placeholder: Codex (gpt-6.1-sol)
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: OS and install method
+      description: Your OS, and how you installed Assayer (npm or git checkout).
+      placeholder: Ubuntu 24.04 on WSL2, checkout
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant output or logs
+      description: Error messages or terminal output (ensure credentials and tokens are redacted).
+      render: shell
+    validations:
+      required: false

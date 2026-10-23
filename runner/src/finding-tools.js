@@ -1,15 +1,17 @@
 #!/usr/bin/env node
 // The lane's two comment tools, as one stdio MCP server the runner offers in session/new.
 // Nothing is posted: each call is appended as a JSON line to $ASSAYER_TOOL_LOG and the
-// engine is told it succeeded. The poster in the control plane renders them later.
+// engine is told it succeeded. The poster renders them later.
 // Server name is argv[2]: `github_inline_comment` serves create_inline_comment,
 // `github_comment` serves update_claude_comment, so the engine sees the same
 // mcp__<server>__<tool> names the Actions lane's prompt uses.
-import { appendFileSync } from 'node:fs';
+import { appendFileSync, readFileSync } from 'node:fs';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 import { looksLikeSecret } from './acp-map.js';
+import { anchorProblem, hunkRanges } from './diff-lines.js';
+import { formatProblem } from './finding-rules.js';
 
 const which = process.argv[2];
 const log = process.env.ASSAYER_TOOL_LOG;
@@ -29,24 +31,33 @@ function record(tool, input) {
   }) + '\n');
 }
 
+let diff = null;
+try { if (process.env.ASSAYER_DIFF) diff = hunkRanges(readFileSync(process.env.ASSAYER_DIFF, 'utf8')); } catch { diff = null; }
+
 const server = new McpServer({ name: which, version: '0.0.0' });
 
 if (which === 'github_inline_comment') {
   server.registerTool('create_inline_comment', {
-    description: 'Create an inline review comment on a specific line or range of the pull request diff.',
+    // Engines reached for `git rev-parse HEAD` to fill commitId, were refused, and filed nothing.
+    description: 'Create an inline review comment on a specific line or range of the pull request diff. Assayer anchors every comment on the head commit itself; no commit id is needed.',
     inputSchema: {
-      path: z.string(),
+      path: z.string().describe('File path relative to the repository root, as in the diff.'),
       body: z.string(),
-      line: z.number().int().optional(),
-      startLine: z.number().int().optional(),
+      line: z.number().int().optional().describe('Last line of the range, in the new file (RIGHT) unless side is LEFT.'),
+      startLine: z.number().int().optional().describe('First line of a multi-line range, in the same hunk as line.'),
       side: z.enum(['LEFT', 'RIGHT']).optional(),
       startSide: z.enum(['LEFT', 'RIGHT']).optional(),
       subjectType: z.string().optional(),
-      commitId: z.string().optional(),
+      commitId: z.string().optional().describe('Leave this out: Assayer uses the head commit.'),
     },
   }, async (input) => {
+    // Every finding is recorded: a refused one could be lost if the engine never re-filed it, and
+    // no heuristic told a re-filing from a new defect. A finding off
+    // the diff posts as a plain comment; the reply says what was off, for the next finding.
     record('create_inline_comment', input);
-    return { content: [{ type: 'text', text: JSON.stringify({ ok: true, recorded: true }) }] };
+    const problem = formatProblem(input.body) ?? (diff && anchorProblem(diff, input, process.env.ASSAYER_CHECKOUT || null));
+    const note = problem ? `Recorded as written, but ${problem}. Do not file this finding again; apply this to the next ones.` : null;
+    return { content: [{ type: 'text', text: JSON.stringify({ ok: true, recorded: true, ...(note ? { note } : {}) }) }] };
   });
 } else if (which === 'github_comment') {
   server.registerTool('update_claude_comment', {

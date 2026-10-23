@@ -1,18 +1,81 @@
 // The engine registry: what to spawn and how it takes its model and credential. Every row is
 // an ACP agent on stdio. A row enters only after an admission run passes; `admitted` records it.
-import { writeFileSync, mkdirSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { parse as parseToml, stringify as stringifyToml } from 'smol-toml';
+import os from 'node:os';
 import path from 'node:path';
 
 // Env is an allowlist per row, never the runner's whole environment (prismalens#169).
 const BASE_ENV = ['PATH', 'HOME', 'LANG', 'TERM', 'TMPDIR', 'NODE_OPTIONS'];
 
+// Codex's read-only mode reads the whole disk, and codex-acp's per-turn policy drops any narrower
+// allow, but keeps deny entries. So the default engine is kept out of where credentials live.
+export const CODEX_DENY = Object.freeze(Object.fromEntries([
+  '~/.config/gh', '~/.ssh', '~/.aws', '~/.azure', '~/.config/gcloud', '~/.kube', '~/.docker', '~/.npmrc', '~/.netrc',
+  '~/.git-credentials', '~/.config/git/credentials', '~/.gnupg', '~/.claude/.credentials.json', '~/.local/share/opencode/auth.json',
+].map((p) => [p, 'deny'])));
+
+// The user's Codex config, read with a TOML parser: quoted keys, inline tables and comments are all
+// valid there, and a regex missed them.
+function codexConfig(env, file = path.join(env.CODEX_HOME || path.join(os.homedir(), '.codex'), 'config.toml')) {
+  try { return { file, toml: parseToml(readFileSync(file, 'utf8')) }; } catch { return { file, toml: null }; }
+}
+// Codex's system layer (its config docs) also declares servers.
+const SYSTEM_CONFIG = '/etc/codex/config.toml';
+const profilesOf = (toml) => Object.values(toml?.profiles && typeof toml.profiles === 'object' ? toml.profiles : {});
+
+// Codex ignores a permission profile when any loaded config sets sandbox_mode (its permissions
+// docs), and the deny list above goes with it. Assayer leaves the user's CODEX_HOME in place.
+export function codexSandboxModeSet(env = process.env) {
+  const { file, toml } = codexConfig(env);
+  if (!toml) return null;
+  return toml.sandbox_mode !== undefined || profilesOf(toml).some((p) => p?.sandbox_mode !== undefined) ? file : null;
+}
+
+// The user's own MCP servers: a real round's Codex called the user's Notion tools unasked. Codex's
+// own inventory and the parsed config, top level and every profile, unioned.
+export function codexUserMcpServers(env = process.env, list = codexMcpList, systemFile = SYSTEM_CONFIG) {
+  const tables = [codexConfig(env).toml, codexConfig(env, systemFile).toml].flatMap((t) => [t?.mcp_servers, ...profilesOf(t).map((p) => p?.mcp_servers)]);
+  const names = new Set(tables.filter((t) => t && typeof t === 'object').flatMap((t) => Object.keys(t)));
+  for (const n of list(env)) names.add(n);
+  return [...names];
+}
+
+// Codex's own inventory. A failure is not an empty list: the round refuses to start rather than
+// run with servers it could not see.
+function codexMcpList(env) {
+  const r = spawnSync('codex', ['mcp', 'list', '--json'], { env: engineEnv(ENGINES.codex, env), encoding: 'utf8', timeout: 15_000 });
+  let names = null;
+  try { names = r.status === 0 ? JSON.parse(r.stdout).map((s) => s.name) : null; } catch { names = null; }
+  if (!Array.isArray(names) || names.some((n) => typeof n !== 'string')) {
+    throw Object.assign(new Error('could not list Codex\'s MCP servers (`codex mcp list --json` failed), so a round cannot switch them off; fix codex or use another engine'), { stage: 'engine-setup' });
+  }
+  return names;
+}
+
+// Codex loads a trusted project's .codex/config.toml, and codex-acp trusts the checkout, so a pull
+// request could configure the engine reviewing it. The checkout's .codex/ and .agents/ (skills) are
+// replaced before the engine starts; the review still sees them in the staged diff. The written
+// config switches off the user's own MCP servers, which no thread-level override reached.
+export function sealCodexCheckout(cwd, env = process.env, list = codexMcpList) {
+  rmSync(path.join(cwd, '.codex'), { recursive: true, force: true });
+  rmSync(path.join(cwd, '.agents'), { recursive: true, force: true });
+  const servers = codexUserMcpServers(env, list);
+  mkdirSync(path.join(cwd, '.codex'), { recursive: true });
+  writeFileSync(path.join(cwd, '.codex', 'config.toml'), stringifyToml({ mcp_servers: Object.fromEntries(servers.map((n) => [n, { enabled: false }])) }));
+  return servers;
+}
+
 export const ENGINES = Object.freeze({
   opencode: {
     command: 'opencode',
+    cli: 'opencode',
+    install: { cli: 'opencode-ai@1.18.30', signIn: null },
     // --pure: no user plugins or global config; --cwd pins the project. Mirrors the prismalens
     // registry row that passed the #561 admission run.
     args: ({ cwd }) => ['acp', '--pure', '--cwd', cwd],
-    envAllow: [...BASE_ENV, 'GH_TOKEN', 'GITHUB_TOKEN', 'XDG_DATA_HOME', 'XDG_CACHE_HOME'],
+    envAllow: [...BASE_ENV, 'XDG_DATA_HOME', 'XDG_CACHE_HOME'],
     credentialKinds: ['api-key', 'user-login'],
     admitted: { version: '1.18.30', by: 'prismalens#561' },
     // OpenCode Zen's free tier needs no key or login. Of its free, non-deprecated, tool-calling
@@ -47,8 +110,10 @@ export const ENGINES = Object.freeze({
     // @zed-industries/codex-acp 0.16.0 is deprecated: its old core is refused gpt-6.1 on a
     // ChatGPT login, and its only refusal aborts the turn.
     command: 'codex-acp',
+    cli: 'codex',
+    install: { cli: '@openai/codex', adapter: '@agentclientprotocol/codex-acp@2.1.1', signIn: 'run `codex login`' },
     args: () => [],
-    envAllow: [...BASE_ENV, 'GH_TOKEN', 'GITHUB_TOKEN', 'CODEX_HOME', 'OPENAI_API_KEY', 'CODEX_API_KEY'],
+    envAllow: [...BASE_ENV, 'CODEX_HOME', 'OPENAI_API_KEY', 'CODEX_API_KEY'],
     credentialKinds: ['api-key', 'user-login'],
     admitted: null,
     // Sol defaults to low effort and caps each tool output at 10k tokens; the Codex template
@@ -59,28 +124,50 @@ export const ENGINES = Object.freeze({
     // The adapter's default mode writes the workspace with an automatic reviewer. read-only puts
     // Codex's own sandbox around every command and asks the runner before leaving it. The
     // sign-in stays in the user's CODEX_HOME: a copied auth.json forks the rotating refresh token.
+    sealCheckout: sealCodexCheckout,
     prepare({ model, env }) {
       return {
         ...env, INITIAL_AGENT_MODE: 'read-only', NO_BROWSER: '1',
-        CODEX_CONFIG: JSON.stringify({ web_search: 'disabled', project_doc_max_bytes: 0, model_reasoning_effort: 'xhigh', features: { plugins: false }, ...(model ? { model } : {}) }),
+        CODEX_CONFIG: JSON.stringify({
+          web_search: 'disabled', project_doc_max_bytes: 0, model_reasoning_effort: 'xhigh', ...(model ? { model } : {}),
+          // A real round tried Codex's own GitHub app to post its summary; no app, browser or computer use.
+          features: { plugins: false, apps: false, browser_use: false, browser_use_external: false, computer_use: false },
+          default_permissions: 'assayer', permissions: { assayer: { filesystem: { glob_scan_max_depth: 3, ':minimal': 'read', ':workspace_roots': 'read', ...CODEX_DENY } } },
+        }),
       };
     },
   },
   'claude-code': {
     command: 'claude-agent-acp',
+    cli: 'claude',
+    install: { cli: '@anthropic-ai/claude-code', adapter: '@agentclientprotocol/claude-agent-acp@0.89.1', signIn: 'run `claude` and type `/login`' },
     args: () => [],
-    envAllow: [...BASE_ENV, 'GH_TOKEN', 'GITHUB_TOKEN', 'ANTHROPIC_API_KEY', 'ANTHROPIC_BASE_URL', 'ANTHROPIC_AUTH_TOKEN',
+    envAllow: [...BASE_ENV, 'ANTHROPIC_API_KEY', 'ANTHROPIC_BASE_URL', 'ANTHROPIC_AUTH_TOKEN',
       'ANTHROPIC_MODEL', 'CLAUDE_CONFIG_DIR', 'CLAUDE_CODE_EXECUTABLE', 'CLAUDE_CODE_DISABLE_BACKGROUND_TASKS',
       'CLAUDE_CODE_USE_BEDROCK', 'CLAUDE_CODE_USE_VERTEX', 'CLAUDE_CODE_USE_FOUNDRY'],
     credentialKinds: ['api-key', 'bedrock', 'vertex', 'foundry', 'user-login'],
     admitted: null, // prismalens#639 passes the gate; no admission record in this repo yet
+    // No user settings, hooks, plugins or CLAUDE.md, and no reads outside the checkout. The adapter
+    // starts in the user's own defaultMode ("auto" ran shell unasked), so the round sets Always ask
+    // and every gated call reaches the policy.
+    sessionMeta: { claudeCode: { options: { settingSources: [], strictMcpConfig: true, settings: { permissions: { blockReadsOutsideWorkingDirectories: true }, attribution: { commit: '', pr: '' }, includeCoAuthoredBy: false } } } },
+    sessionMode: 'default',
     prepare({ model, env }) {
       return { ...env, CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: '1', ...(model ? { ANTHROPIC_MODEL: model } : {}) };
     },
   },
 });
 
-// `extraAllow` names one credential variable the daemon handed this round (--credential-env),
+// npm 11 skips install scripts unless allowed; Claude Code's and OpenCode's postinstalls put their
+// native binaries in place.
+const NEEDS_SCRIPTS = ['@anthropic-ai/claude-code', 'opencode-ai'];
+export function installArgs(missing) {
+  const pkgs = missing.map((m) => m.pkg);
+  const allow = pkgs.filter((p) => NEEDS_SCRIPTS.some((n) => p === n || p.startsWith(`${n}@`)));
+  return ['i', '-g', ...pkgs, ...allow.map((p) => `--allow-scripts=${p.replace(/(.)@[^/]*$/, '$1')}`)];
+}
+
+// `extraAllow` names one credential variable the caller handed this round (--credential-env),
 // so a key under a name of the operator's choosing reaches the engine and nothing else does.
 export function engineEnv(row, source = process.env, extraAllow = []) {
   const out = {};

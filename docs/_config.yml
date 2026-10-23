@@ -1,0 +1,14 @@
+title: Assayer
+description: Code review that runs on your machine, posts as you, and closes what you fixed.
+theme: minima
+baseurl: /assayer
+url: https://prismalens.github.io
+# The design notes are working documents for maintainers, not user docs.
+exclude:
+  - design/
+header_pages:
+  - getting-started.md
+  - how-it-works.md
+  - engines.md
+  - agents.md
+  - telemetry.md

@@ -1,20 +1,40 @@
 {
-  "name": "@prismalens/review-runner",
-  "private": true,
-  "version": "0.0.0",
+  "name": "@prismalens/assayer",
+  "version": "0.0.1",
+  "description": "Code review on your machine with your own Codex, Claude Code or OpenCode sign-in, posted under your own GitHub login.",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/prismalens/assayer.git",
+    "directory": "runner"
+  },
   "type": "module",
-  "description": "Leases review jobs, runs an engine over the Agent Client Protocol, and emits assayer/v1 events.",
+  "engines": {
+    "node": ">=22"
+  },
+  "files": [
+    "src/*.js",
+    "src/*.py",
+    "src/*.sh",
+    "prompt/*.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
-    "test": "node --test"
+    "test": "node --test 'test/*.test.js'"
   },
   "bin": {
-    "assayer": "src/review.js",
-    "assayer-run": "src/run.js",
-    "assayer-runner": "src/daemon.js"
+    "assayer": "src/review.js"
   },
   "dependencies": {
     "@agentclientprotocol/sdk": "1.4.0",
+    "@clack/prompts": "1.8.1",
     "@modelcontextprotocol/sdk": "^1.0.0",
+    "mdast-util-from-markdown": "2.0.2",
+    "mdast-util-gfm": "3.1.0",
+    "micromark-extension-gfm": "3.0.0",
+    "smol-toml": "1.9.0",
     "zod": "^3.23.0"
   }
 }

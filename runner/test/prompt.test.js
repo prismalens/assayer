@@ -184,3 +184,13 @@ test('the Codex template renders the round commits and leaves no placeholder', (
   assert.doesNotMatch(out, /@@/);
   assert.throws(() => renderCodexPrompt('@@REPO@@ @@LEVEL@@', { repo: 'o/r', pr: 1, baseSha: 'b', headSha: 'a' }), /LEVEL/);
 });
+
+test('a local prompt for an engine that asks first reads the staged diff, never git', async () => {
+  const { renderCodexPrompt, forFileTools } = await import('../src/prompt.js');
+  const { readFileSync } = await import('node:fs');
+  const tpl = readFileSync(new URL('../prompt/codex.md', import.meta.url), 'utf8');
+  const out = forFileTools(renderCodexPrompt(tpl, { repo: 'local/x', pr: 0, baseSha: 'a'.repeat(40), headSha: 'b'.repeat(40), local: { label: 'x', dirty: true } }));
+  assert.match(out, /\.claude-review\.diff/);
+  assert.doesNotMatch(out, /git diff [0-9a-f]/);
+  assert.match(out, /never run `git`/);
+});

@@ -4,8 +4,8 @@
 // allowlist, and write raw.jsonl (every ACP message), tool-log.jsonl (every comment tool
 // call), events.jsonl (assayer/v1) and summary.json (turns, usage, wall clock) to --out.
 // Exit code: 0 completed, 3 engine error, 4 timed out, 2 usage.
-import { spawn } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync, statSync, copyFileSync, chmodSync, accessSync, constants } from 'node:fs';
+import { execFileSync, spawn } from 'node:child_process';
+import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync, statSync, lstatSync, copyFileSync, chmodSync, accessSync, constants, realpathSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Writable, Readable } from 'node:stream';
@@ -65,8 +65,9 @@ export function whichGh(pathVar) {
   return null;
 }
 
-function mcpServer(name, toolLog) {
-  return { name, command: process.execPath, args: [path.join(HERE, 'finding-tools.js'), name], env: [{ name: 'ASSAYER_TOOL_LOG', value: toolLog }] };
+function mcpServer(name, toolLog, diffPath = null) {
+  const env = [{ name: 'ASSAYER_TOOL_LOG', value: toolLog }, ...(diffPath ? [{ name: 'ASSAYER_DIFF', value: diffPath }, { name: 'ASSAYER_CHECKOUT', value: path.dirname(diffPath) }] : [])];
+  return { name, command: process.execPath, args: [path.join(HERE, 'finding-tools.js'), name], env };
 }
 
 export async function runRound(opts, { log = (s) => process.stderr.write(s + '\n') } = {}) {
@@ -83,7 +84,7 @@ export async function runRound(opts, { log = (s) => process.stderr.write(s + '\n
   const stderrPath = path.join(out, 'engine-stderr.log');
   for (const f of [rawPath, toolLog, stderrPath]) writeFileSync(f, ''); // fresh per run, never appended across runs
 
-  const row = ENGINES[opts.engine];
+  const row = opts.row ?? ENGINES[opts.engine]; // opts.row: a test points a round at a fake agent
   if (!opts.model && row.defaultModel) opts.model = row.defaultModel;
 
   // The caller decides what is reviewable, never the agent (#105): the manifest and the diff
@@ -93,7 +94,7 @@ export async function runRound(opts, { log = (s) => process.stderr.write(s + '\n
   if (opts.stage) {
     const t0 = Date.now();
     try {
-      const m = await buildManifest({ cwd, repo: opts.repo, pr: opts.pr, mode: opts.mode, headSha: opts.headSha, ghToken: opts.ghToken ?? process.env.GH_TOKEN ?? process.env.GITHUB_TOKEN });
+      const m = await buildManifest({ cwd, repo: opts.repo, pr: opts.pr, mode: opts.mode, headSha: opts.headSha, ghToken: opts.ghToken ?? process.env.GH_TOKEN ?? process.env.GITHUB_TOKEN, localFiles: opts.localFiles, baseSha: opts.baseSha });
       staged = { files: m.manifest?.files?.length ?? null, reviewable: (m.manifest?.files ?? []).filter((f) => !f.filtered_by).length, diff_bytes: m.diffBytes, ms: Date.now() - t0, refused: m.refused };
       writeFileSync(path.join(out, 'manifest-stderr.log'), m.stderr ?? '');
     } catch (e) {
@@ -116,22 +117,25 @@ export async function runRound(opts, { log = (s) => process.stderr.write(s + '\n
     log('assayer-run: the manifest refused this pull request by size; no engine started');
     return summary;
   }
-  const source = opts.engineGh === 'offline' ? Object.fromEntries(Object.entries(process.env).filter(([k]) => k !== 'GH_TOKEN' && k !== 'GITHUB_TOKEN')) : process.env;
+  if (opts.baseSha && opts.headSha) pinInstructionFiles(cwd, opts.baseSha, opts.headSha);
+  const source = Object.fromEntries(Object.entries(process.env).filter(([k]) => k !== 'GH_TOKEN' && k !== 'GITHUB_TOKEN'));
+  row.sealCheckout?.(cwd, source);
   const baseEnv = engineEnv(row, source, opts.credentialEnv ? [opts.credentialEnv] : []);
   // The engine's `gh` is the shim: `pr comment` is recorded, never posted. Story: #184 day one.
   const realGh = whichGh(baseEnv.PATH ?? process.env.PATH ?? '');
-  if (!realGh) throw new Error('gh is not on PATH; the lane\'s prompt needs it for read commands');
+  // Offline, gh reads fail closed anyway, so a machine without gh still gets the summary shim.
+  if (!realGh && opts.engineGh !== 'offline') throw new Error('gh is not on PATH; the lane\'s prompt needs it for read commands');
   const binDir = path.join(out, 'bin');
   mkdirSync(binDir, { recursive: true });
   copyFileSync(path.join(HERE, 'gh-shim.sh'), path.join(binDir, 'gh'));
   chmodSync(path.join(binDir, 'gh'), 0o755);
   const env = row.prepare({ model: opts.model, outDir: out, env: {
     ...baseEnv, PATH: `${binDir}${path.delimiter}${baseEnv.PATH ?? process.env.PATH ?? ''}`,
-    ASSAYER_TOOL_LOG: toolLog, ASSAYER_REAL_GH: realGh,
+    ASSAYER_TOOL_LOG: toolLog, ASSAYER_REAL_GH: realGh ?? 'false',
     // The shim is a copy in <out>/bin; secret-check.js stays here beside its imports.
     ASSAYER_SECRET_CHECK: path.join(HERE, 'secret-check.js'),
     // A local round runs on the operator's own login, which is a broad write token. The
-    // engine gets an empty gh config instead, so its gh reads fail closed (OBJ-018).
+    // engine gets an empty gh config instead, so its gh reads fail closed.
     ...(opts.engineGh === 'offline' ? { GH_CONFIG_DIR: path.join(out, 'gh-offline') } : {}),
   } });
   if (opts.engineGh === 'offline') mkdirSync(path.join(out, 'gh-offline'), { recursive: true });
@@ -146,6 +150,15 @@ export async function runRound(opts, { log = (s) => process.stderr.write(s + '\n
   const started = Date.now();
   let conclusion = null; let permissions = { allowed: 0, rejected: 0 };
   let timer = null; let idle = null; let timedOut = false;
+  // A subagent's work sends the parent no updates; an open tool call is activity, not idleness.
+  // The wall clock still bounds the round (a free model's subagents ran past 8 quiet minutes).
+  const open = new Set();
+  let lastUpdate = Date.now();
+  const track = (u) => {
+    if (!u?.toolCallId || (u.sessionUpdate !== 'tool_call' && u.sessionUpdate !== 'tool_call_update')) return;
+    if (u.status === 'completed' || u.status === 'failed') open.delete(u.toolCallId);
+    else if (u.sessionUpdate === 'tool_call' || u.status) open.add(u.toolCallId);
+  };
 
   const stream = acp.ndJsonStream(Writable.toWeb(child.stdin), Readable.toWeb(child.stdout));
   const app = acp.client({ name: 'assayer-runner' })
@@ -172,21 +185,32 @@ export async function runRound(opts, { log = (s) => process.stderr.write(s + '\n
         try { ctx.notify?.(acp.methods.agent.session.cancel, { sessionId: mapper.sessionId }); } catch { /* fall through to kill */ }
         setTimeout(() => child.kill('SIGKILL'), 5000).unref();
       };
-      timer = setTimeout(() => cancel('wall-clock'), opts.timeoutMs);
-      idle = setTimeout(() => cancel('idle'), opts.idleMs);
+      // No outside signal tells a slow subagent from one whose provider stalled, so an open one
+      // waits for the wall clock, which then names the quiet stall.
+      timer = setTimeout(() => cancel(open.size && Date.now() - lastUpdate >= opts.idleMs ? 'stalled' : 'wall-clock'), opts.timeoutMs);
+      const onIdle = () => {
+        if (open.size) { raw('idle_deferred', { open: open.size }); idle = setTimeout(onIdle, opts.idleMs); return; }
+        cancel('idle');
+      };
+      idle = setTimeout(onIdle, opts.idleMs);
       const init = await ctx.request(acp.methods.agent.initialize, { protocolVersion: acp.PROTOCOL_VERSION, clientCapabilities: {} });
       raw('initialize', { result: init });
       mapper.events[0]._meta = { agent: init.agentInfo ?? null, protocol: init.protocolVersion, staged };
       if (Array.isArray(init.authMethods) && init.authMethods.length && init._meta?.authenticated === false) {
         throw Object.assign(new Error('agent requires authentication: ' + init.authMethods.map((m) => m.id).join(', ')), { stage: 'initialize' });
       }
-      return ctx.buildSession(cwd)
-        .withMcpServer(mcpServer('github_inline_comment', toolLog))
+      return ctx.buildSession({ cwd, mcpServers: [], ...(row.sessionMeta ? { _meta: row.sessionMeta } : {}) })
+        .withMcpServer(mcpServer('github_inline_comment', toolLog, staged && existsSync(path.join(cwd, '.claude-review.diff')) ? path.join(cwd, '.claude-review.diff') : null))
         .withMcpServer(mcpServer('github_comment', toolLog))
         .withSession(async (session) => {
           mapper.sessionId = session.sessionId;
           raw('session', { sessionId: session.sessionId, response: session.newSessionResponse ?? null });
           mapper.onSession(session.newSessionResponse);
+          if (row.sessionMode) {
+            await ctx.request(acp.methods.agent.session.setMode, { sessionId: session.sessionId, modeId: row.sessionMode })
+              .catch((e) => { throw Object.assign(e, { stage: 'session' }); });
+            raw('set_mode', { modeId: row.sessionMode });
+          }
           const p = session.prompt(promptText);
           p.catch(() => {}); // surfaced through nextUpdate's stop or thrown below
           for (;;) {
@@ -194,7 +218,8 @@ export async function runRound(opts, { log = (s) => process.stderr.write(s + '\n
             if (m.kind === 'stop') { raw('stop', { response: m.response }); mapper.onStop(m.response); return m.response; }
             const n = m.notification ?? m.update ?? m;
             raw('update', { notification: n });
-            clearTimeout(idle); idle = setTimeout(() => cancel('idle'), opts.idleMs);
+            track(n.update ?? n); lastUpdate = Date.now();
+            clearTimeout(idle); idle = setTimeout(onIdle, opts.idleMs);
             mapper.onUpdate(n.update ?? n);
           }
         });
@@ -228,9 +253,34 @@ export async function runRound(opts, { log = (s) => process.stderr.write(s + '\n
   return summary;
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {
   let opts;
   try { opts = parseArgs(process.argv.slice(2)); } catch (e) { process.stderr.write(`assayer-run: ${e.message}\n`); process.exit(2); }
   runRound(opts).then((s) => process.exit(s.conclusion === 'completed' ? 0 : s.conclusion === 'timed-out' ? 4 : 3))
     .catch((e) => { process.stderr.write(`assayer-run: ${e.message}\n`); process.exit(2); });
+}
+
+
+
+// The prompts treat AGENTS.md and CLAUDE.md as the repository's rules, so a pull request could
+// rewrite them to excuse its own defect. The checkout keeps the base commit's
+// versions; the pull request's changes to them are still reviewed in the staged diff.
+export function pinInstructionFiles(cwd, baseSha, headSha) {
+  const git = (args) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+  const changed = git(['diff', '--name-only', '-z', '--no-renames', baseSha, headSha]).split('\0').filter((p) => /(^|\/)(AGENTS|CLAUDE)\.md$/.test(p));
+  for (const rel of changed) {
+    const file = path.join(cwd, rel);
+    let base = null;
+    try { base = execFileSync('git', ['show', `${baseSha}:${rel}`], { cwd, stdio: ['ignore', 'pipe', 'ignore'] }); } catch { /* added by the pull request */ }
+    // Only a plain file or link is ever replaced or removed. A path the pull request turned into a
+    // directory keeps its contents, and a restore that cannot be made is skipped, never fatal.
+    let kind = null;
+    try { const st = lstatSync(file); kind = st.isDirectory() ? 'dir' : 'file'; } catch { kind = null; }
+    if (kind === 'dir') continue;
+    try {
+      if (base === null) { if (kind) rmSync(file, { force: true }); }
+      else { mkdirSync(path.dirname(file), { recursive: true }); writeFileSync(file, base); }
+    } catch { /* a parent that is now a file: the base rules cannot be restored there */ }
+  }
+  return changed;
 }

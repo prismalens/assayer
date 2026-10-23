@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { parseArgs, parseTarget, livenessRecords, priorReview, publish, fileJournal, withheldCount } from '../src/review.js';
 import { readFileSync } from 'node:fs';
-import { LIVENESS_PREFIX, livenessBody } from '../../worker/poster.js';
+import { LIVENESS_PREFIX, livenessBody } from '../src/poster.js';
 
 const HEAD = 'a'.repeat(40);
 const live = (over = {}) => ({
@@ -24,13 +24,13 @@ describe('assayer review (#184)', () => {
   it('prints by default and posts only when asked', () => {
     const o = parseArgs(['review', 'a/b#1']);
     assert.equal(o.post, false);
-    assert.equal(o.engine, 'codex');
+    assert.equal(o.engine, null, 'the engine resolves from flag, then ~/.assayer/config.json, then a one-time pick');
     assert.equal(parseArgs(['review', 'a/b#1', '--post', '--engine', 'opencode']).post, true);
     assert.throws(() => parseArgs(['review', 'a/b#1', '--engine', 'nope']), /unknown engine/);
     assert.throws(() => parseArgs(['review', 'a/b#1', '--bogus']), /unknown argument/);
   });
 
-  it('parses liveness markers and blocks a head this engine already reviewed (OBJ-001)', () => {
+  it('parses liveness markers and blocks a head this engine already reviewed', () => {
     const recs = livenessRecords([live(), { id: 2, user: { login: 'x' }, body: 'hello' }]);
     assert.equal(recs.length, 1);
     assert.deepEqual({ sha: recs[0].sha, engine: recs[0].engine, rounds: recs[0].rounds, reviewed: recs[0].reviewed }, { sha: HEAD, engine: 'codex', rounds: 2, reviewed: true });
@@ -49,7 +49,7 @@ describe('assayer review (#184)', () => {
     assert.ok(priorReview(bot, { headSha: HEAD, engine: 'codex', canWrite: () => false }));
   });
 
-  it('counts a corrupt tool-log line as a withheld finding (OBJ-005)', () => {
+  it('counts a corrupt tool-log line as a withheld finding', () => {
     assert.equal(withheldCount({ dropped: [{ tool: 'create_inline_comment' }, { tool: 'post_summary' }], tool_log_corrupt_lines: 2 }), 3);
     assert.equal(withheldCount({}), 0);
   });
@@ -72,5 +72,19 @@ describe('assayer review (#184)', () => {
     const again = fileJournal(dir);
     assert.ok(again.has('finding:1'));
     assert.match(readFileSync(path.join(dir, 'publish-journal.jsonl'), 'utf8'), /"find\n\{"key":"finding:1"/);
+  });
+});
+
+describe('posting through a flaky network', () => {
+  const fail = (code) => Object.assign(new TypeError('fetch failed'), { cause: { code } });
+  it('retries a read, and a write only when it never connected', async () => {
+    const { retryingFetch } = await import('../src/review.js');
+    const calls = [];
+    const flaky = (errs) => async (url, init) => { calls.push(init?.method ?? 'GET'); const e = errs.shift(); if (e) throw e; return { status: 200 }; };
+    const nowait = { wait: async () => {} };
+    assert.equal((await retryingFetch(flaky([fail('ECONNRESET')]), nowait)('u')).status, 200);
+    assert.equal((await retryingFetch(flaky([fail('ENOTFOUND')]), nowait)('u', { method: 'POST' })).status, 200);
+    await assert.rejects(retryingFetch(flaky([fail('ECONNRESET')]), nowait)('u', { method: 'POST' }), /fetch failed/);
+    await assert.rejects(retryingFetch(flaky([fail('X'), fail('X'), fail('X')]), nowait)('u'), /fetch failed/);
   });
 });

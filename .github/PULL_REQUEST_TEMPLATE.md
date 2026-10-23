@@ -1,0 +1,37 @@
+<!--
+Thanks for contributing to Assayer! The trunk (`main`) is protected: every
+change lands via a pull request. Open this PR against `main`.
+Keep PRs focused and small where you can.
+-->
+
+## What & why
+
+<!-- What does this change do, and what problem does it solve? -->
+
+## Type of change
+
+- [ ] Bug fix
+- [ ] New feature
+- [ ] Refactor / internal
+- [ ] Docs
+- [ ] Build / CI / chore
+
+## Checklist
+
+- [ ] PR is opened against `main`
+- [ ] PR title follows Conventional Commits (`feat:`, `fix:`, `docs:`, ...) — it
+      becomes the squashed commit subject
+- [ ] Tests pass locally (`cd runner && npm test`)
+- [ ] Tests added or updated for the change
+- [ ] No secrets, tokens, or private content committed
+- [ ] Breaking config or schema change → called out above
+
+## Docs
+
+- [ ] Docs updated for every changed user-facing surface (READMEs, docs/, help strings), or none affected (explain below)
+
+<!-- If none affected, explain: -->
+
+## Related issues
+
+<!-- e.g. closes #123 -->

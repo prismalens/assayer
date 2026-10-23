@@ -1,0 +1,63 @@
+name: Tests
+
+on:
+  # Every base, so a pull request stacked on another one is tested too.
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  runner:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: [22, 24]
+    defaults:
+      run:
+        working-directory: runner
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1  # v7.1.0
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+          cache-dependency-path: runner/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      # Unit tests only: the contract, the policy and the mapper. The engine itself is
+      # covered by runner/scripts/permission-probe.sh, which needs a model. Story: gh-workflows#184.
+      - name: Runner tests
+        run: npm test
+
+  # The Pages site builds from docs/ with GitHub's own builder, so a broken page fails here
+  # rather than after the repository goes public.
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/jekyll-build-pages@44a6e6beabd48582f863aeeb6cb2151cc1716697  # v1.0.13
+        with:
+          source: ./docs
+          destination: ./_site
+
+      - name: Require every page
+        run: |
+          set -euo pipefail
+          for page in index getting-started/index how-it-works/index engines/index agents/index telemetry/index; do
+            f="_site/${page}.html"
+            [ -f "$f" ] || f="_site/${page%/index}.html"
+            [ -f "$f" ] || { echo "::error::${page} did not build"; exit 1; }
+          done
+          test -f _site/assets/hero-light.svg
+          ! test -e _site/design
