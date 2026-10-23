@@ -45,7 +45,7 @@ export function codexUserMcpServers(env = process.env, list = codexMcpList, syst
 // Codex's own inventory. A failure is not an empty list: the round refuses to start rather than
 // run with servers it could not see.
 function codexMcpList(env) {
-  const r = spawnSync('codex', ['mcp', 'list', '--json'], { env: { ...process.env, ...env }, encoding: 'utf8', timeout: 15_000 });
+  const r = spawnSync('codex', ['mcp', 'list', '--json'], { env: engineEnv(ENGINES.codex, env), encoding: 'utf8', timeout: 15_000 });
   let names = null;
   try { names = r.status === 0 ? JSON.parse(r.stdout).map((s) => s.name) : null; } catch { names = null; }
   if (!Array.isArray(names) || names.some((n) => typeof n !== 'string')) {
@@ -75,7 +75,7 @@ export const ENGINES = Object.freeze({
     // --pure: no user plugins or global config; --cwd pins the project. Mirrors the prismalens
     // registry row that passed the #561 admission run.
     args: ({ cwd }) => ['acp', '--pure', '--cwd', cwd],
-    envAllow: [...BASE_ENV, 'GH_TOKEN', 'GITHUB_TOKEN', 'XDG_DATA_HOME', 'XDG_CACHE_HOME'],
+    envAllow: [...BASE_ENV, 'XDG_DATA_HOME', 'XDG_CACHE_HOME'],
     credentialKinds: ['api-key', 'user-login'],
     admitted: { version: '1.18.30', by: 'prismalens#561' },
     // OpenCode Zen's free tier needs no key or login. Of its free, non-deprecated, tool-calling
@@ -113,7 +113,7 @@ export const ENGINES = Object.freeze({
     cli: 'codex',
     install: { cli: '@openai/codex', adapter: '@agentclientprotocol/codex-acp@2.1.1', signIn: 'run `codex login`' },
     args: () => [],
-    envAllow: [...BASE_ENV, 'GH_TOKEN', 'GITHUB_TOKEN', 'CODEX_HOME', 'OPENAI_API_KEY', 'CODEX_API_KEY'],
+    envAllow: [...BASE_ENV, 'CODEX_HOME', 'OPENAI_API_KEY', 'CODEX_API_KEY'],
     credentialKinds: ['api-key', 'user-login'],
     admitted: null,
     // Sol defaults to low effort and caps each tool output at 10k tokens; the Codex template
@@ -142,7 +142,7 @@ export const ENGINES = Object.freeze({
     cli: 'claude',
     install: { cli: '@anthropic-ai/claude-code', adapter: '@agentclientprotocol/claude-agent-acp@0.89.1', signIn: 'run `claude` and type `/login`' },
     args: () => [],
-    envAllow: [...BASE_ENV, 'GH_TOKEN', 'GITHUB_TOKEN', 'ANTHROPIC_API_KEY', 'ANTHROPIC_BASE_URL', 'ANTHROPIC_AUTH_TOKEN',
+    envAllow: [...BASE_ENV, 'ANTHROPIC_API_KEY', 'ANTHROPIC_BASE_URL', 'ANTHROPIC_AUTH_TOKEN',
       'ANTHROPIC_MODEL', 'CLAUDE_CONFIG_DIR', 'CLAUDE_CODE_EXECUTABLE', 'CLAUDE_CODE_DISABLE_BACKGROUND_TASKS',
       'CLAUDE_CODE_USE_BEDROCK', 'CLAUDE_CODE_USE_VERTEX', 'CLAUDE_CODE_USE_FOUNDRY'],
     credentialKinds: ['api-key', 'bedrock', 'vertex', 'foundry', 'user-login'],

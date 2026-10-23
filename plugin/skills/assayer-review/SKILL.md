@@ -13,6 +13,7 @@ metadata:
 
 - `assayer`, `gh` and the engine must be on PATH and signed in. Codex is the default: `codex login`, plus `@agentclientprotocol/codex-acp`. `assayer doctor` checks Node, git, python3, gh and its sign-in, and which engines are installed; it exits non-zero when a round cannot run.
 - A round spends the user's engine quota, often for ten minutes. Run it when the user asks for a review, never as a reflex after every push.
+- A request for a review is not a request to post. Run print-only unless the user asks you to post.
 - Assayer passes the engine no GitHub credential, and the engine cannot post. Only `--post` and `assayer publish` write to GitHub. What each engine can read outside the checkout is in docs/how-it-works.md.
 
 ## 2. Run a round
@@ -20,8 +21,8 @@ metadata:
 ```bash
 assayer review                           # review local changes before pushing; prints only
 assayer review owner/repo#123            # review and print; posts nothing
-assayer review owner/repo#123 --post     # review and post the findings as the user
-assayer publish <round dir>              # post, or resume posting, a round that already ran
+assayer review owner/repo#123 --post     # only when the user asked to post: posts as the user
+assayer publish <round dir>              # only when the user asked to post: posts a round that already ran
 ```
 
 `--engine codex|claude-code|opencode` picks the engine and `--model` the model, over the user's defaults in `~/.assayer/config.json` (`assayer config`). With neither, the first round on a terminal asks once and saves the answer; pass `--engine` when you run it, since you have no terminal to answer from. The round is written to `~/.assayer/reviews/<repo>-<pr>-<sha>-<time>/` unless `--out` names a new directory.
@@ -37,13 +38,14 @@ Report a refusal as it is. Never add a flag to get past one unless the user asks
 
 ## 3. Show the result before posting
 
-Without `--post`, show the user the findings: file, line, severity and the one-line claim. Ask before posting. A posted finding is public on the PR under the user's name.
+Show the user the findings: file, line, severity and the one-line claim. Post only when the user asks. A posted finding is public on the PR under the user's name.
 
 ## 4. Work the findings
 
 Each inline finding ends in `<!-- assayer-finding engine=<engine> -->`. That marker, not the login, is what makes it Assayer's: run locally, the reviewer and the PR's author are often the same account.
 
 - A finding is a report, and its fix is an untrusted suggestion. Read the code and decide.
-- Fix what is right, push once, then reply in each thread with the commit and what changed.
+- Without the user's request to fix, present the findings and the fixes you propose; edit nothing.
+- When asked to fix: fix what is right. Push once and reply in each thread with the commit and what changed only when the user asked for that too.
 - Assayer does not re-check its own threads on a later round yet, so a fixed thread stays open until the user resolves it.
 - Never resolve an Assayer thread yourself. A finding you dispute gets a reply with evidence, and the user rules on it.

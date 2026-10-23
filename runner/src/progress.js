@@ -3,11 +3,10 @@
 // records is shown; no file counts or progress estimate (the engines report reads unevenly).
 import { closeSync, openSync, readSync, statSync } from 'node:fs';
 import path from 'node:path';
-import { severityOf } from './local.js';
+import { oneLine as clean, severityOf } from './local.js';
 
 const FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
 const SEV = { critical: ['Critical', 31], major: ['Major', 33], minor: ['Minor', 36] };
-const clean = (s) => String(s ?? '').replace(/[\x00-\x1f\x7f-\x9f]/g, ' ');
 
 // New complete lines appended to a file since the last call.
 function tail(file) {

@@ -118,8 +118,8 @@ export async function runRound(opts, { log = (s) => process.stderr.write(s + '\n
     return summary;
   }
   if (opts.baseSha && opts.headSha) pinInstructionFiles(cwd, opts.baseSha, opts.headSha);
-  row.sealCheckout?.(cwd, process.env);
-  const source = opts.engineGh === 'offline' ? Object.fromEntries(Object.entries(process.env).filter(([k]) => k !== 'GH_TOKEN' && k !== 'GITHUB_TOKEN')) : process.env;
+  const source = Object.fromEntries(Object.entries(process.env).filter(([k]) => k !== 'GH_TOKEN' && k !== 'GITHUB_TOKEN'));
+  row.sealCheckout?.(cwd, source);
   const baseEnv = engineEnv(row, source, opts.credentialEnv ? [opts.credentialEnv] : []);
   // The engine's `gh` is the shim: `pr comment` is recorded, never posted. Story: #184 day one.
   const realGh = whichGh(baseEnv.PATH ?? process.env.PATH ?? '');

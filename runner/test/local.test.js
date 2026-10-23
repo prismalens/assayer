@@ -179,6 +179,15 @@ describe('local prompt and CLI', () => {
     assert.deepEqual(out.map((l) => l.trim().split('  ')[1]), ['two', 'four', 'three', 'one']);
   });
 
+  it('prints no terminal escape the engine wrote', () => {
+    const body = `_🟠 Major_\n<details></details>\n**all clear\x1b]0;pwned\x07**`;
+    for (const tty of [false, true]) {
+      const [line] = findingLines([{ path: 'a\x1b[2J.js', line: 1, body }], { tty });
+      assert.equal(line.replace(/\x1b\[[0-9;]*m/g, '').includes('\x1b'), false);
+      assert.equal(line.includes('\x07'), false);
+    }
+  });
+
   it('says why a round failed and what to do about it', () => {
     const lines = failureLines({ engine: 'codex', conclusion: 'failed', errors: [{ failure_class: 'auth-failed', message: 'Authentication required' }] });
     assert.deepEqual(lines, ['  auth-failed: Authentication required\n  -> sign in to codex once: run `codex login`']);

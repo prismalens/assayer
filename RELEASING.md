@@ -16,8 +16,10 @@ npm pack                     # prismalens-assayer-<version>.tgz
 Use a fresh container or VM with Node 24, git, python3 and gh, and none of your own config:
 
 ```bash
-docker run --rm -it node:24 bash      # then install gh and python3, or use a fresh VM
-npm i -g ./prismalens-assayer-<version>.tgz
+docker run --rm -it -v "$PWD:/pkg:ro" node:24 bash   # from runner/; or copy the tarball to a fresh VM
+# in the container: install gh and python3, then
+gh auth login
+npm i -g /pkg/prismalens-assayer-<version>.tgz
 ```
 
 | Step | Command | Pass when |

@@ -15,7 +15,7 @@ import { renderPrompt, renderCodexPrompt, promptHash, laneTokens, forFileTools }
 import { checkout } from './github.js';
 import { runRound } from './run.js';
 import { LIVENESS_PREFIX, postRound, withoutEngineCredit } from './poster.js';
-import { changedFiles, chooseBase, localCheckout, refusal as localRefusal, repoTop, sameTree, severityOf, snapshot, withheldCount, git as localGit } from './local.js';
+import { changedFiles, chooseBase, localCheckout, oneLine, printable, refusal as localRefusal, repoTop, sameTree, severityOf, snapshot, withheldCount, git as localGit } from './local.js';
 
 export { severityOf, withheldCount };
 import { hookCommand, indexRound } from './hook.js';
@@ -299,10 +299,11 @@ export function findingLines(findings, { tty = false } = {}) {
     .sort((a, b) => SEVERITIES.indexOf(a.sev) - SEVERITIES.indexOf(b.sev) || a.i - b.i)
     .map(({ f, sev }) => {
       const after = f.body.slice(f.body.indexOf('</details>') + 1);
-      const title = (/\*\*(.+?)\*\*/.exec(after)?.[1] ?? f.body.split('\n')[0]).slice(0, 140);
-      if (!tty) return `  [${sev[0].toUpperCase()}${sev.slice(1)}] ${f.path}:${f.line ?? '?'}  ${title}`;
+      const title = oneLine(/\*\*(.+?)\*\*/.exec(after)?.[1] ?? f.body.split('\n')[0]).slice(0, 140);
+      const where = oneLine(f.path);
+      if (!tty) return `  [${sev[0].toUpperCase()}${sev.slice(1)}] ${where}:${f.line ?? '?'}  ${title}`;
       const [label, code] = SEV_STYLE[sev];
-      return `  \x1b[${code}m● ${label.padEnd(8)}\x1b[0m ${f.path}:${f.line ?? '?'}  ${title.replace(/`([^`]+)`/g, '\x1b[36m$1\x1b[39m')}`;
+      return `  \x1b[${code}m● ${label.padEnd(8)}\x1b[0m ${where}:${f.line ?? '?'}  ${title.replace(/`([^`]+)`/g, '\x1b[36m$1\x1b[39m')}`;
     });
 }
 
@@ -344,7 +345,7 @@ function printRound(dir) {
   lines.push(...findingLines(findings, { tty: Boolean(process.stdout.isTTY) }));
   lines.push(...refusalNote(s));
   const summary = events.findLast((e) => e.type === 'summary');
-  if (summary) lines.push('', terminalMarkdown(withoutEngineCredit(summary.body), Boolean(process.stdout.isTTY)));
+  if (summary) lines.push('', terminalMarkdown(printable(withoutEngineCredit(summary.body)), Boolean(process.stdout.isTTY)));
   process.stdout.write(lines.join('\n') + '\n');
 }
 

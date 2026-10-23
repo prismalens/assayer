@@ -8,6 +8,11 @@ import path from 'node:path';
 const ZERO = /^0+$/;
 const IDENTITY = { GIT_AUTHOR_NAME: 'assayer', GIT_AUTHOR_EMAIL: 'assayer@localhost', GIT_COMMITTER_NAME: 'assayer', GIT_COMMITTER_EMAIL: 'assayer@localhost' };
 
+// Engine text is steered by the pull request it reads, so terminal escapes are stripped before
+// it is printed; Assayer's own styling goes on after.
+export const oneLine = (s) => String(s ?? '').replace(/[\x00-\x1f\x7f-\x9f]/g, ' ');
+export const printable = (s) => String(s ?? '').replace(/[\x00-\x08\x0b-\x1f\x7f-\x9f]/g, '');
+
 export function refusal(reason, message) {
   return Object.assign(new Error(message), { refusal: reason });
 }
@@ -15,10 +20,10 @@ export function refusal(reason, message) {
 // GIT_OPTIONAL_LOCKS=0: without it a read like `status` may rewrite the user's index.
 export function git(cwd, args, { env = {}, allowFail = false } = {}) {
   try {
-    return execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, GIT_OPTIONAL_LOCKS: '0', ...env } }).trim();
+    return execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 256 * 1024 * 1024, env: { ...process.env, GIT_OPTIONAL_LOCKS: '0', ...env } }).trim();
   } catch (e) {
     if (allowFail) return null;
-    throw new Error(`git ${args.slice(0, 2).join(' ')} failed: ${String(e.stderr ?? e.message).trim().split('\n')[0]}`);
+    throw new Error(`git ${args.slice(0, 2).join(' ')} failed: ${(String(e.stderr ?? '').trim() || e.message).split('\n')[0]}`);
   }
 }
 

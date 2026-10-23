@@ -3,7 +3,7 @@
 // for the tree being pushed. It warns by default, blocks only when asked, and fails open.
 import { appendFileSync, existsSync, readFileSync, readdirSync, rmSync, writeFileSync, chmodSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
-import { git, isZero, severityOf, withheldCount } from './local.js';
+import { git, isZero, oneLine, severityOf, withheldCount } from './local.js';
 import { assayerHome, onPath, SELF } from './settings.js';
 
 export const MARKER = '# assayer pre-push hook';
@@ -112,9 +112,9 @@ export function prePush({ lines, rounds, mode, treeOf, isAncestor }) {
       if (serious.length) messages.push(`assayer: ${lref} has ${serious.length} major or critical finding(s) from round ${path.basename(round.dir)}:`);
       for (const f of serious) {
         const after = f.body.slice(f.body.indexOf('</details>') + 1);
-        const title = (/\*\*(.+?)\*\*/.exec(after)?.[1] ?? '').replace(/[\x00-\x1f]/g, ' ').slice(0, 100);
+        const title = oneLine(/\*\*(.+?)\*\*/.exec(after)?.[1]).slice(0, 100);
         const sev = severityOf(f.body);
-        messages.push(`  [${sev[0].toUpperCase()}${sev.slice(1)}] ${f.path}:${f.line ?? '?'}  ${title}`);
+        messages.push(`  [${sev[0].toUpperCase()}${sev.slice(1)}] ${oneLine(f.path)}:${f.line ?? '?'}  ${title}`);
       }
       flagged ||= serious.length > 0 || round.withheld > 0;
     }

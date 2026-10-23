@@ -11,6 +11,14 @@ describe('engine rows', () => {
     assert.equal(row.sessionMeta.claudeCode.options.settings.permissions.blockReadsOutsideWorkingDirectories, true);
   });
 
+  it('no row lets a GitHub token through', async () => {
+    const { engineEnv } = await import('../src/engines.js');
+    for (const [name, row] of Object.entries(ENGINES)) {
+      const env = engineEnv(row, { PATH: '/bin', GH_TOKEN: 'gho_x', GITHUB_TOKEN: 'ghp_x' });
+      assert.deepEqual(Object.keys(env), ['PATH'], name);
+    }
+  });
+
   it('Codex and OpenCode keep their own controls and set no mode', () => {
     assert.equal(ENGINES.codex.sessionMode, undefined);
     assert.equal(ENGINES.opencode.sessionMode, undefined);

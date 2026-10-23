@@ -11,7 +11,7 @@ milestone progress, not a stability promise.
 - **Patch (`0.N.P`)** — fixes and small corrections landed between milestones,
   in a package that has already been released.
 
-Releases are cut by hand until release tooling is set up.
+Releases are cut by merging the release-please PR; [RELEASING.md](RELEASING.md) has the gate.
 
 ## Alpha
 
