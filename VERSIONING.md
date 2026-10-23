@@ -15,7 +15,7 @@ Releases are cut by merging the release-please PR; [RELEASING.md](RELEASING.md) 
 
 ## Alpha
 
-Assayer is alpha. Any 0.x release, patch included, may change behaviour or
+Assayer is alpha. Any 0.0.x release may change behaviour or
 break a workflow. Read the
 [release notes](https://github.com/prismalens/assayer/releases) before you upgrade.
 

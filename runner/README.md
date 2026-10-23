@@ -1,6 +1,6 @@
 # runner
 
-> **Assayer is alpha.** Any 0.x release may change behaviour or break a workflow; read the
+> **Assayer is alpha.** Any 0.0.x release may change behaviour or break a workflow; read the
 > [release notes](https://github.com/prismalens/assayer/releases) before you upgrade. See
 > [VERSIONING.md](https://github.com/prismalens/assayer/blob/main/VERSIONING.md).
 

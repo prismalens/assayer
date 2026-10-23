@@ -8,7 +8,7 @@
 ![Status: alpha](https://img.shields.io/badge/status-alpha-d9a441)
 
 > [!WARNING]
-> Assayer is **alpha**. Any 0.x release may change behaviour or break a
+> Assayer is **alpha**. Any 0.0.x release may change behaviour or break a
 > workflow; read the [release notes](https://github.com/prismalens/assayer/releases)
 > before you upgrade. See [VERSIONING.md](VERSIONING.md).
 
