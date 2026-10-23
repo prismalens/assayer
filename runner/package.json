@@ -28,7 +28,7 @@
     "assayer": "src/review.js"
   },
   "dependencies": {
-    "@agentclientprotocol/sdk": "1.4.0",
+    "@agentclientprotocol/sdk": "2.0.0",
     "@clack/prompts": "1.8.1",
     "@modelcontextprotocol/sdk": "^1.32.1",
     "mdast-util-from-markdown": "2.1.0",
