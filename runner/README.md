@@ -1,5 +1,9 @@
 # runner
 
+> **Assayer is alpha.** Any 0.x release may change behaviour or break a workflow; read the
+> [release notes](https://github.com/prismalens/assayer/releases) before you upgrade. See
+> [VERSIONING.md](https://github.com/prismalens/assayer/blob/main/VERSIONING.md).
+
 Runs one review round over the [Agent Client Protocol](https://agentclientprotocol.com): spawns
 an engine, opens a session on a checkout, offers the lane's two comment tools as MCP servers,
 sends the lane's prompt, answers every permission request from the lane's tool allowlist, and
