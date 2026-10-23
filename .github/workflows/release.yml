@@ -27,6 +27,9 @@ jobs:
       - id: rp
         uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7  # v5.0.0
         with:
+          # A PAT: Actions may not open pull requests here, and a PR opened with GITHUB_TOKEN
+          # starts no checks, so the ruleset's required checks would never report.
+          token: ${{ secrets.RELEASE_PAT || github.token }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
 
