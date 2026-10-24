@@ -1,15 +1,13 @@
 # Versioning
 
-Assayer is pre-1.0. Versions use semver's shape, but read against the
-[GitHub milestones](https://github.com/prismalens/assayer/milestones). They track
-milestone progress, not a stability promise.
+Assayer is pre-1.0 and alpha. Versions use semver's shape but make no stability promise.
 
-## 0.x
+## 0.0.x
 
-- **Minor (`0.N.0`)**, a milestone release from the
-  [GitHub milestones](https://github.com/prismalens/assayer/milestones).
-- **Patch (`0.N.P`)** — fixes and small corrections landed between milestones,
-  in a package that has already been released.
+Every release is a patch: `0.0.P`. release-please runs with `versioning: "always-bump-patch"`
+(#9), so a `feat:` or a breaking change bumps the patch too. Assayer stays on 0.0.x until the
+maintainer decides it is ready to leave alpha; that change is a deliberate edit to
+`release-please-config.json`, not something a commit message triggers.
 
 Releases are cut by merging the release-please PR; [RELEASING.md](RELEASING.md) has the gate.
 
@@ -27,5 +25,5 @@ There is no nightly channel yet.
 
 ## 1.0.0
 
-`1.0.0` is a deliberate stability promise, not just the number after `0.9`.
-Until then, treat every `0.x` as free to change.
+`1.0.0` is a deliberate stability promise, not just the next number.
+Until then, treat every `0.0.x` as free to change.
