@@ -25,6 +25,8 @@ function tail(file) {
   };
 }
 
+const titleOf = (body) => (typeof body === 'string' ? /\*\*(.+?)\*\*/.exec(body.slice(body.indexOf('</details>') + 1))?.[1]?.trim() ?? null : null);
+
 export function findingLine(entry, { color = true } = {}) {
   const body = entry.input?.body;
   if (typeof body !== 'string') return null;
@@ -36,13 +38,14 @@ export function findingLine(entry, { color = true } = {}) {
 }
 
 export function startProgress(dir, { engine, stream = process.stderr, now = Date.now, every = 100 } = {}) {
-  if (!stream.isTTY) return { stop() {} };
+  if (!stream.isTTY) return { stop() {}, shown: () => null };
   const started = now();
   const raw = tail(path.join(dir, 'raw.jsonl'));
   const tools = tail(path.join(dir, 'tool-log.jsonl'));
   let calls = 0; let filed = 0; let frame = 0; let last = started;
+  const pending = new Map(); // off-diff findings, shown at the end unless a re-filing replaces them
   const clock = () => { const s = Math.floor((now() - started) / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
-  const tick = () => {
+  const tick = (final = false) => {
     for (const e of raw()) {
       if (e.kind !== 'update') continue;
       last = now();
@@ -51,9 +54,15 @@ export function startProgress(dir, { engine, stream = process.stderr, now = Date
     const out = [];
     for (const e of tools()) {
       if (e.tool !== 'create_inline_comment') continue;
+      // Superseded as acp-map.js supersedes it: by `replaces`, or a later filing with its path and title.
+      if (typeof e.input?.replaces === 'string') pending.delete(e.input.replaces);
+      const key = `${e.input?.path}\n${titleOf(e.input?.body)}`;
+      for (const [id, p] of pending) if (p.key === key && titleOf(e.input?.body)) pending.delete(id);
       const line = findingLine(e);
-      if (line) { filed += 1; out.push(line); }
+      if (line && typeof e.id === 'string') pending.set(e.id, { line, key });
+      else if (line) { filed += 1; out.push(line); }
     }
+    if (final) { for (const p of pending.values()) { filed += 1; out.push(p.line); } pending.clear(); }
     // A stalled provider looks like slow work from here; say how long it has been quiet.
     const quiet = Math.floor((now() - last) / 1000);
     const hush = quiet >= 120 ? ` · quiet ${Math.floor(quiet / 60)}m, Ctrl-C stops it` : '';
@@ -62,5 +71,5 @@ export function startProgress(dir, { engine, stream = process.stderr, now = Date
   };
   const timer = setInterval(tick, every);
   let stopped = false;
-  return { stop() { if (stopped) return; stopped = true; clearInterval(timer); tick(); stream.write('\r\x1b[2K'); } };
+  return { stop() { if (stopped) return; stopped = true; clearInterval(timer); tick(true); stream.write('\r\x1b[2K'); }, shown: () => filed };
 }

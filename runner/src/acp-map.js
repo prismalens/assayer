@@ -133,8 +133,20 @@ export class SessionMapper {
   // rawInput, so a call the engine only narrated is not a finding.
   #applyToolLog(entries) {
     let summary = null; let summaryCount = 0; let summarySource = null;
+    // A finding that missed the diff is superseded by a later filing naming its id (finding-tools.js).
+    // Models re-file at the right line but often leave `replaces` out (0.0.2 check), so a later
+    // filing on the same path with the same bold title supersedes it too; the original could
+    // never be placed.
+    const title = (body) => (typeof body === 'string' ? /\*\*(.+?)\*\*/.exec(body.slice(body.indexOf('</details>') + 1))?.[1]?.trim() ?? null : null);
+    const replaced = new Set(entries.filter((e) => e.tool === FINDING_TOOL && typeof e.input?.replaces === 'string').map((e) => e.input.replaces));
+    entries.forEach((e, i) => {
+      if (e.tool !== FINDING_TOOL || typeof e.id !== 'string' || replaced.has(e.id)) return;
+      const t = title(e.input?.body);
+      if (t && entries.slice(i + 1).some((x) => x.tool === FINDING_TOOL && x.input?.path === e.input?.path && title(x.input?.body) === t)) replaced.add(e.id);
+    });
     for (const e of entries) {
       const input = e.input && typeof e.input === 'object' ? e.input : {};
+      if (e.tool === FINDING_TOOL && typeof e.id === 'string' && replaced.has(e.id)) { this.dropped.push({ why: `replaced by a re-filing of ${e.id}`, merged: true, at: e.at }); continue; }
       // The recorder already refused this body; say so rather than blaming a missing field.
       if (e.redacted) { this.dropped.push({ why: `recorder redacted this record: ${e.redacted}`, tool: e.tool ?? null, at: e.at }); continue; }
       if (e.tool === FINDING_TOOL) {
