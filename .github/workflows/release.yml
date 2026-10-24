@@ -58,3 +58,25 @@ jobs:
       - name: Publish
         working-directory: runner
         run: npm publish --provenance --access public
+
+      - name: Version
+        id: version
+        working-directory: runner
+        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+
+      # The registry lists a version before its tarball serves (prismalens/gh-workflows#250).
+      - uses: prismalens/gh-workflows/actions/wait-npm-tarball@6e7fad0d8fde93657d2d79b9e3e9dd16d2afa784  # main 2026-10-24
+        with:
+          package: '@prismalens/assayer'
+          version: ${{ steps.version.outputs.version }}
+
+      - uses: prismalens/gh-workflows/actions/npm-install-retry@6e7fad0d8fde93657d2d79b9e3e9dd16d2afa784  # main 2026-10-24
+        with:
+          command: npm i -g "@prismalens/assayer@${{ steps.version.outputs.version }}"
+
+      - name: The published version starts
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          got="$(assayer --version)"
+          [ "$got" = "$VERSION" ] || { echo "::error::npm's @prismalens/assayer@$VERSION printed '$got'"; exit 1; }
