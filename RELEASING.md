@@ -29,7 +29,7 @@ npm i -g /pkg/prismalens-assayer-<version>.tgz
 | Engine | install one engine from the README and sign in; `assayer doctor` | that engine reads ready, exit 0 |
 | Review | `assayer review <sandbox-owner>/<sandbox-repo>#<n>` in a terminal | the telemetry notice prints first; the round completes, prints findings and coverage, posts nothing |
 | Post | `assayer publish <round dir>` | findings land inline under your login, each ending in the `assayer-finding` marker |
-| Telemetry | `assayer telemetry status` | lists `install_active` and `round_finished` with no repository name, path or login |
+| Telemetry | `assayer telemetry status` | lists `install_active` from the Post row, with no repository name, path or login. The Review run sent nothing, because the run that shows the notice never sends. A second `assayer review` adds `round_finished` |
 | Off | `assayer telemetry off`, then another command | nothing new in `telemetry status` |
 | Uninstall | `npm rm -g @prismalens/assayer` | `assayer` is gone; `~/.assayer` is the only thing left |
 

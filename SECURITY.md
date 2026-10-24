@@ -2,12 +2,12 @@
 
 ## Supported versions
 
-Assayer is pre-1.0. Security fixes land in the latest 0.x release; older
+Assayer is pre-1.0. Security fixes land in the latest 0.0.x release; older
 releases do not get fixes.
 
 | Version | Supported |
 | ------- | --------- |
-| latest 0.x release | yes |
+| latest 0.0.x release | yes |
 | anything older | no |
 
 ## Reporting a vulnerability
