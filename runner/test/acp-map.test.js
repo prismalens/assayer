@@ -261,3 +261,27 @@ test('same title, different body or severity: both stay, so a Critical never hid
   assert.equal(w.filter((e) => e.type === 'finding').length, 2);
   assert.equal(atOrAbove(found, 'critical'), 2);
 });
+
+test('a finding that missed the diff is dropped once a re-filing names its id; one never re-filed stays', () => {
+  const m = mk();
+  const b = '_🎯 Functional Correctness_ | _🔴 Critical_ | _⚡ Quick win_\n\n**eval**\n\nx';
+  const evs = m.finish({ toolLog: [
+    { tool: 'create_inline_comment', id: 'fa-1', input: { path: 'sum.js', line: 17, body: b } },
+    { tool: 'create_inline_comment', input: { path: 'sum.js', line: 9, body: b, replaces: 'fa-1' } },
+    { tool: 'create_inline_comment', id: 'fa-2', input: { path: 'sum.js', line: 12, body: b + ' 2' } },
+  ] });
+  assert.deepEqual(evs.filter((e) => e.type === 'finding').map((e) => e.line), [9, 12]);
+  assert.ok(m.dropped.some((d) => d.merged && /replaced by a re-filing of fa-1/.test(d.why)));
+});
+
+test('a re-filing that leaves replaces out still supersedes the misplaced finding when path and title match', () => {
+  const m = mk();
+  const b = (t) => `_🎯 Functional Correctness_ | _🔴 Critical_ | _⚡ Quick win_\n\n**${t}**\n\nx`;
+  const evs = m.finish({ toolLog: [
+    { tool: 'create_inline_comment', id: 'fa-1', input: { path: 'sum.js', line: 12, body: b('Off-by-one in loop') } },
+    { tool: 'create_inline_comment', input: { path: 'sum.js', line: 4, body: b('Off-by-one in loop') + ' re-worded' } },
+    { tool: 'create_inline_comment', id: 'fa-2', input: { path: 'sum.js', line: 17, body: b('eval on coupon') } },
+    { tool: 'create_inline_comment', input: { path: 'other.js', line: 3, body: b('eval on coupon') } },
+  ] });
+  assert.deepEqual(evs.filter((e) => e.type === 'finding').map((e) => `${e.path}:${e.line}`), ['sum.js:4', 'sum.js:17', 'other.js:3']);
+});

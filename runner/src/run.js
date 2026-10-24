@@ -152,7 +152,8 @@ export async function runRound(opts, { log = (s) => process.stderr.write(s + '\n
   const raw = (kind, payload) => appendFileSync(rawPath, JSON.stringify({ at: new Date().toISOString(), kind, ...payload }) + '\n');
   const started = Date.now();
   let conclusion = null; let permissions = { allowed: 0, rejected: 0 };
-  let timer = null; let idle = null; let timedOut = false;
+  let timer = null; let idle = null; let stall = null; let timedOut = false;
+  const stallMs = opts.stallMs ?? (row.stallMin ? row.stallMin * 60 * 1000 : null);
   // A subagent's work sends the parent no updates; an open tool call is activity, not idleness.
   // The wall clock still bounds the round (a free model's subagents ran past 8 quiet minutes).
   const open = new Set();
@@ -196,6 +197,9 @@ export async function runRound(opts, { log = (s) => process.stderr.write(s + '\n
         cancel('idle');
       };
       idle = setTimeout(onIdle, opts.idleMs);
+      // OpenCode streams its subagents' work to the parent (a healthy round never went 26s quiet,
+      // fixtures/opencode-sreforge-183), so minutes of silence with one open is a stalled provider (#10).
+      if (stallMs) stall = setInterval(() => { if (open.size && Date.now() - lastUpdate >= stallMs) cancel('stalled'); }, Math.min(15_000, stallMs / 4));
       const init = await ctx.request(acp.methods.agent.initialize, { protocolVersion: acp.PROTOCOL_VERSION, clientCapabilities: {} });
       raw('initialize', { result: init });
       mapper.events[0]._meta = { agent: init.agentInfo ?? null, protocol: init.protocolVersion, staged };
@@ -231,7 +235,7 @@ export async function runRound(opts, { log = (s) => process.stderr.write(s + '\n
     if (timedOut) conclusion = 'timed-out';
     else mapper.onError(err, err?.stage ?? 'prompt');
   } finally {
-    clearTimeout(timer); clearTimeout(idle);
+    clearTimeout(timer); clearTimeout(idle); clearInterval(stall);
     if (childExit === null) child.kill('SIGTERM');
   }
   if (timedOut) conclusion = 'timed-out';

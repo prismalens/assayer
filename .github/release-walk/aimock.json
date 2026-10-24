@@ -1,0 +1,11 @@
+{
+  "fixtures": [
+    { "match": { "userMessage": ".claude-review-manifest.json", "hasToolResult": false },
+      "response": { "toolCalls": [ { "name": "mcp__github_inline_comment__create_inline_comment",
+        "arguments": { "path": "coupon.js", "line": 3,
+          "body": "_🔒 Security & Privacy_ | _🔴 Critical_ | _⚡ Quick win_\n\n**`eval` runs the coupon code as JavaScript**\n\nA coupon code from the request reaches `eval`, so a crafted code runs on the server. Look the code up in `coupons` instead.\n\n<!-- release-walk scripted finding -->" } } ] } },
+    { "match": { "userMessage": ".claude-review-manifest.json", "hasToolResult": true },
+      "response": { "content": "## Code review\n\nOne critical finding: `coupon.js` passes a request value to `eval`." } },
+    { "match": {}, "response": { "content": "ok" } }
+  ]
+}

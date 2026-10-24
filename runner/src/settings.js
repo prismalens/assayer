@@ -84,7 +84,7 @@ export async function resolveDefaults(o, { settings, isTTY, pick, save, log }) {
     } else if (isTTY && pick) {
       r.engine = await pick();
       save('engine', r.engine);
-      log(`assayer: ${r.engine} is now your default engine; change it with \`${SELF} config set engine <name>\`, or pass --engine for one round`);
+      log(`assayer: ${r.engine} is now the engine every review uses; change it with \`${SELF} config set engine <name>\`, or pass --engine for one round`);
     } else r.engine = DEFAULT_ENGINE;
   }
   if (r.failOn === null && settings['fail-on']) r.failOn = settings['fail-on'];

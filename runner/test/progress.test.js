@@ -33,6 +33,24 @@ describe('live view', () => {
     assert.equal(out.match(/Cache key/g).length, 1);
   });
 
+  it('holds a finding that missed the diff until the end, and never shows one a re-filing replaced', () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), 'assayer-prog-'));
+    writeFileSync(path.join(dir, 'raw.jsonl'), '');
+    writeFileSync(path.join(dir, 'tool-log.jsonl'), '');
+    const s = sink(true);
+    const view = startProgress(dir, { engine: 'claude-code', stream: s, every: 1e9 });
+    const log = (o) => appendFileSync(path.join(dir, 'tool-log.jsonl'), JSON.stringify(o) + '\n');
+    log({ tool: 'create_inline_comment', id: 'fa-1', input: { path: 'sum.js', line: 17, body: body('🔴 Critical', 'eval on a coupon code') } });
+    log({ tool: 'create_inline_comment', input: { path: 'sum.js', line: 9, body: body('🔴 Critical', 'eval on a coupon code'), replaces: 'fa-1' } });
+    log({ tool: 'create_inline_comment', id: 'fa-2', input: { path: 'sum.js', line: 12, body: body('🟠 Major', 'never re-filed') } });
+    view.stop();
+    const out = plain(s.out);
+    assert.doesNotMatch(out, /sum\.js:17/);
+    assert.match(out, /sum\.js:9 {2}eval on a coupon code/);
+    assert.match(out, /sum\.js:12 {2}never re-filed/);
+    assert.equal(view.shown(), 2);
+  });
+
   it('strips terminal control characters from engine text', () => {
     const line = findingLine({ input: { path: 'a\x1b[2Jb', line: 1, body: body('🟡 Minor', 'x\x07y') } }, { color: false });
     assert.equal(line, '  ● Minor    a [2Jb:1  x y');

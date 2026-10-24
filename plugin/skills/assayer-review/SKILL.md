@@ -11,7 +11,7 @@ metadata:
 
 ## 1. Before you run it
 
-- `assayer`, `gh` and the engine must be on PATH and signed in. Codex is the default: `codex login`, plus `@agentclientprotocol/codex-acp`. `assayer doctor` checks Node, git, python3, gh and its sign-in, and which engines are installed; it exits non-zero when a round cannot run.
+- `assayer`, `gh` and the engine must be on PATH and signed in. For Codex that is `codex login`, plus `@agentclientprotocol/codex-acp`. `assayer doctor` checks Node, git, python3, gh and its sign-in, and which engines are installed; it exits non-zero when a round cannot run.
 - A round spends the user's engine quota, often for ten minutes. Run it when the user asks for a review, never as a reflex after every push.
 - A request for a review is not a request to post. Run print-only unless the user asks you to post.
 - Assayer passes the engine no GitHub credential, and the engine cannot post. Only `--post` and `assayer publish` write to GitHub. What each engine can read outside the checkout is in docs/how-it-works.md.

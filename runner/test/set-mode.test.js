@@ -50,6 +50,22 @@ it('a subagent quiet until the wall clock is reported as stalled, not cut early'
   } finally { delete process.env.FAKE_AGENT_MODE; }
 });
 
+it('an engine with a stall bound ends a round whose open subagent went quiet, well before the wall clock', async () => {
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'assayer-stall2-'));
+  const repo = path.join(dir, 'repo');
+  execFileSync('git', ['init', '-q', repo]);
+  writeFileSync(path.join(dir, 'prompt.md'), 'review it');
+  Object.assign(process.env, { FAKE_AGENT_LOG: path.join(dir, 'prompted.log'), FAKE_AGENT_MODE: 'slow-tool', FAKE_AGENT_WAIT: '20000' });
+  const row = { command: process.execPath, args: () => [FAKE], envAllow: ['PATH', 'HOME', 'FAKE_AGENT_LOG', 'FAKE_AGENT_MODE', 'FAKE_AGENT_WAIT'], prepare: ({ env }) => env, stallMin: 1 / 60 };
+  const t0 = Date.now();
+  try {
+    const s = await runRound({ engine: 'fake', row, cwd: repo, prompt: path.join(dir, 'prompt.md'), out: path.join(dir, 'out'), engineGh: 'offline', mode: 'review', stage: false, timeoutMs: 15000, idleMs: 1500 }, { log: () => {} });
+    assert.equal(s.conclusion, 'timed-out');
+    assert.equal(s.timed_out_by, 'stalled');
+    assert.ok(Date.now() - t0 < 10000, 'ended by the stall bound, not the 15s wall clock');
+  } finally { delete process.env.FAKE_AGENT_MODE; }
+});
+
 it('a busy provider fails the round as api-unavailable, with a retry hint', async () => {
   const { failureLines } = await import('../src/review.js');
   const dir = mkdtempSync(path.join(os.tmpdir(), 'assayer-capacity-'));

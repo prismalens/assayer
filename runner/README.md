@@ -23,14 +23,14 @@ posting, a round that already ran. Nothing is hosted: a round run on your machin
 ```bash
 # once, from a checkout of this repository
 cd runner && npm ci && npm link
-npm i -g @openai/codex@0.162.1 @agentclientprotocol/codex-acp@2.1.1 && codex login    # the default engine
+npm i -g @openai/codex@0.162.1 @agentclientprotocol/codex-acp@2.1.1 && codex login
 gh auth login
 
 assayer review prismalens/sreforge#183            # print only
 assayer review prismalens/sreforge#183 --post     # post as you
 ```
 
-`assayer review` with no target reviews local changes not yet pushed, against `--base` or the upstream, `origin`'s default branch, `main` or `master`. It snapshots the working tree through a temporary index into its own checkout, prints only, and exits 4 with `--fail-on critical|major|minor` when it finds that or worse. `assayer hook install|uninstall` manages an opt-in pre-push hook that reads finished local rounds and never starts one; `assayer.prepush` (`off`, `warn`, `block`) sets what it does.
+`assayer review` with no target reviews local changes not yet pushed, against `--base` or the upstream, `origin`'s default branch, `main` or `master`; on `main` or `master` with none of those, against the last commit, so only uncommitted work is reviewed. It snapshots the working tree through a temporary index into its own checkout, prints only, and exits 4 with `--fail-on critical|major|minor` when it finds that or worse. `assayer hook install|uninstall` manages an opt-in pre-push hook that reads finished local rounds and never starts one; `assayer.prepush` (`off`, `warn`, `block`) sets what it does.
 
 `assayer doctor` lists what a round needs on this machine and exits non-zero when something required is missing; `assayer --version` prints the package version. `assayer telemetry on|off|status` controls the usage counts described in the top-level README's Telemetry section.
 

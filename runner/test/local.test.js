@@ -68,10 +68,12 @@ describe('local mode', () => {
     assert.deepEqual([s.dirty, s.head], [false, g(clean, 'rev-parse', 'HEAD')]);
   });
 
-  it('chooses the upstream merge base, honours --base, and refuses when there is none', () => {
+  it('chooses the upstream merge base, honours --base, falls back to HEAD on main, and refuses when there is none', () => {
     const { origin, work } = fixture();
     assert.deepEqual(chooseBase(work), { sha: g(origin, 'rev-parse', 'HEAD'), source: 'upstream' });
     assert.equal(chooseBase(work, { base: 'HEAD' }).source, '--base HEAD');
+    assert.deepEqual(chooseBase(origin), { sha: g(origin, 'rev-parse', 'HEAD'), source: 'HEAD' }, 'main with no upstream reviews uncommitted work');
+    g(origin, 'branch', '-m', 'trunk');
     assert.throws(() => chooseBase(origin), (e) => e.refusal === 'no_base');
     assert.throws(() => chooseBase(work, { base: 'nope' }), (e) => e.refusal === 'no_base');
   });
