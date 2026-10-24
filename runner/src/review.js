@@ -47,7 +47,7 @@ Examples:
   ${SELF} review owner/repo#123 --post      post them inline on the pull request, as you
   ${SELF} review                            review your uncommitted work before you push
   ${SELF} doctor                            check what this machine has for a round
-  ${SELF} config set engine claude-code     change your default engine (codex, claude-code, opencode)
+  ${SELF} config set engine claude-code     set the engine every review uses (codex, claude-code, opencode)
 
 The first review asks which engine to use and can install it. Rounds are kept in ~/.assayer/reviews.
 Docs: https://github.com/prismalens/assayer#readme`;

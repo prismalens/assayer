@@ -23,7 +23,7 @@ posting, a round that already ran. Nothing is hosted: a round run on your machin
 ```bash
 # once, from a checkout of this repository
 cd runner && npm ci && npm link
-npm i -g @openai/codex@0.162.1 @agentclientprotocol/codex-acp@2.1.1 && codex login    # the default engine
+npm i -g @openai/codex@0.162.1 @agentclientprotocol/codex-acp@2.1.1 && codex login
 gh auth login
 
 assayer review prismalens/sreforge#183            # print only

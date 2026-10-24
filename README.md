@@ -32,7 +32,7 @@ The first review asks which engine to use (Codex, Claude Code or OpenCode) and s
 ```bash
 assayer review owner/repo#123 --post       # post the findings on the pull request, as you
 assayer review                             # review your local changes before you push
-assayer config set engine claude-code      # change your default engine
+assayer config set engine claude-code      # the engine every review uses from now on
 ```
 
 To try it without installing anything, one command does the same round: `npx @prismalens/assayer review owner/repo#123`. The pre-push hook needs the global install.
@@ -78,9 +78,9 @@ It refuses before spending any quota when the pull request is closed, carries th
 
 | Engine | Install | Sign-in |
 | --- | --- | --- |
-| Codex (default) | `npm i -g @openai/codex @agentclientprotocol/codex-acp@2.1.1` | `codex login`, or `OPENAI_API_KEY` |
+| Codex | `npm i -g @openai/codex @agentclientprotocol/codex-acp@2.1.1` | `codex login`, or `OPENAI_API_KEY` |
 | Claude Code | `npm i -g @anthropic-ai/claude-code @agentclientprotocol/claude-agent-acp@0.89.1 --allow-scripts=@anthropic-ai/claude-code` | run `claude` and type `/login`, or `ANTHROPIC_API_KEY` |
-| OpenCode | `npm i -g opencode-ai@1.18.30 --allow-scripts=opencode-ai` | none needed for its free models |
+| OpenCode | `npm i -g opencode-ai@1.18.30 --allow-scripts=opencode-ai` | none needed for its free models, though the default free model often stalls mid-round; pick one with `--model` |
 
 Use whichever sign-in your plan offers. Each provider's own terms apply: [OpenAI](https://openai.com/policies/), [Anthropic](https://www.anthropic.com/legal), [OpenCode](https://opencode.ai). `assayer doctor` shows which engines are ready on this machine.
 
