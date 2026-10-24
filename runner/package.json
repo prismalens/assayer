@@ -1,6 +1,6 @@
 {
   "name": "@prismalens/assayer",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Code review on your machine with your own Codex, Claude Code or OpenCode sign-in, posted under your own GitHub login.",
   "license": "Apache-2.0",
   "repository": {

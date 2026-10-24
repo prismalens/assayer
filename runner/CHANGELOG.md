@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.2](https://github.com/prismalens/assayer/compare/v0.0.1...v0.0.2) (2026-10-24)
+
+
+### Bug Fixes
+
+* **runner:** agent config a pull request adds or changes goes back to base before the engine starts ([#12](https://github.com/prismalens/assayer/issues/12)) ([40ba0aa](https://github.com/prismalens/assayer/commit/40ba0aacb1a5a2c750055277bfb75300aeb43fa0))
+
 ## 0.0.1 (2026-10-23)
 
 
