@@ -1,7 +1,7 @@
 // The engine registry: what to spawn and how it takes its model and credential. Every row is
 // an ACP agent on stdio. A row enters only after an admission run passes; `admitted` records it.
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { parse as parseToml, stringify as stringifyToml } from 'smol-toml';
 import os from 'node:os';
 import path from 'node:path';
@@ -52,25 +52,6 @@ function codexMcpList(env) {
     throw Object.assign(new Error('could not list Codex\'s MCP servers (`codex mcp list --json` failed), so a round cannot switch them off; fix codex or use another engine'), { stage: 'engine-setup' });
   }
   return names;
-}
-
-// A pull request's own agent config would configure, or run code in, the engine reviewing it:
-// opencode imports .opencode/plugin/*.js even under --pure and OPENCODE_DISABLE_PROJECT_CONFIG
-// (prismalens/prismalens#916). Stripped at any depth from the throwaway checkout before any engine
-// starts; the review still sees these files in the staged diff.
-export const AGENT_CONFIG = Object.freeze(new Set(['.opencode', 'opencode.json', 'opencode.jsonc', '.claude', '.mcp.json', '.gemini', '.codex', '.agents']));
-export function sealAgentConfig(cwd) {
-  const removed = [];
-  const walk = (dir) => {
-    for (const e of readdirSync(dir, { withFileTypes: true })) {
-      if (e.name === '.git') continue;
-      const p = path.join(dir, e.name);
-      if (AGENT_CONFIG.has(e.name)) { rmSync(p, { recursive: true, force: true }); removed.push(path.relative(cwd, p).split(path.sep).join('/')); }
-      else if (e.isDirectory()) walk(p);
-    }
-  };
-  walk(cwd);
-  return removed;
 }
 
 // Codex loads a trusted project's .codex/config.toml, and codex-acp trusts the checkout, so a pull

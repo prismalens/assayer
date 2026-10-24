@@ -12,7 +12,7 @@ import { Writable, Readable } from 'node:stream';
 import * as acp from '@agentclientprotocol/sdk';
 import { SessionMapper, readToolLog } from './acp-map.js';
 import { decide, chooseOption } from './policy.js';
-import { ENGINES, engineEnv, sealAgentConfig } from './engines.js';
+import { ENGINES, engineEnv } from './engines.js';
 import { buildManifest } from './manifest.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -117,10 +117,11 @@ export async function runRound(opts, { log = (s) => process.stderr.write(s + '\n
     log('assayer-run: the manifest refused this pull request by size; no engine started');
     return summary;
   }
-  if (opts.baseSha && opts.headSha) pinInstructionFiles(cwd, opts.baseSha, opts.headSha);
+  if (opts.baseSha && opts.headSha) {
+    const pinned = pinBaseFiles(cwd, opts.baseSha, opts.headSha);
+    if (pinned.length) log(`assayer-run: kept the base version of what the pull request changed in: ${pinned.join(', ')}`);
+  }
   const source = Object.fromEntries(Object.entries(process.env).filter(([k]) => k !== 'GH_TOKEN' && k !== 'GITHUB_TOKEN'));
-  const sealed = sealAgentConfig(cwd);
-  if (sealed.length) log(`assayer-run: removed the pull request's agent config before the engine starts: ${sealed.join(', ')}`);
   row.sealCheckout?.(cwd, source);
   const baseEnv = engineEnv(row, source, opts.credentialEnv ? [opts.credentialEnv] : []);
   // The engine's `gh` is the shim: `pr comment` is recorded, never posted. Story: #184 day one.
@@ -264,12 +265,14 @@ if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.me
 
 
 
-// The prompts treat AGENTS.md and CLAUDE.md as the repository's rules, so a pull request could
-// rewrite them to excuse its own defect. The checkout keeps the base commit's
-// versions; the pull request's changes to them are still reviewed in the staged diff.
-export function pinInstructionFiles(cwd, baseSha, headSha) {
+// A pull request could rewrite the repository's rules (AGENTS.md, CLAUDE.md) to excuse its own
+// defect, or ship agent config the engine loads at start: opencode imports .opencode/plugin/*.js
+// even under --pure. The owner's config at the base commit stays (prismalens/prismalens#817);
+// what the pull request changed is put back to base, as claude-code-action does (CVE-2026-47751).
+export const BASE_PINNED = /(^|\/)(AGENTS\.md|CLAUDE\.md|CLAUDE\.local\.md|\.mcp\.json|\.claude\.json|opencode\.jsonc?|(\.claude|\.opencode|\.codex|\.agents|\.gemini)\/.*)$/;
+export function pinBaseFiles(cwd, baseSha, headSha) {
   const git = (args) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
-  const changed = git(['diff', '--name-only', '-z', '--no-renames', baseSha, headSha]).split('\0').filter((p) => /(^|\/)(AGENTS|CLAUDE)\.md$/.test(p));
+  const changed = git(['diff', '--name-only', '-z', '--no-renames', baseSha, headSha]).split('\0').filter((p) => BASE_PINNED.test(p));
   for (const rel of changed) {
     const file = path.join(cwd, rel);
     let base = null;
