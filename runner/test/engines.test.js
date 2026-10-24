@@ -87,6 +87,21 @@ describe('the user\'s own MCP servers and a pull request\'s engine config', () =
     assert.equal(ENGINES.codex.sealCheckout, sealCodexCheckout);
   });
 
+  it('every engine\'s checkout loses the pull request\'s agent config at any depth, and nothing else', async () => {
+    const { sealAgentConfig } = await import('../src/engines.js');
+    const { existsSync, mkdirSync, mkdtempSync, writeFileSync } = await import('node:fs');
+    const os = (await import('node:os')).default; const path = (await import('node:path')).default;
+    const co = mkdtempSync(path.join(os.tmpdir(), 'checkout-'));
+    const put = (rel, body = 'x') => { mkdirSync(path.dirname(path.join(co, rel)), { recursive: true }); writeFileSync(path.join(co, rel), body); };
+    put('.opencode/plugin/evil.js'); put('opencode.json'); put('pkg/a/opencode.jsonc'); put('.claude/settings.json');
+    put('.mcp.json'); put('pkg/.gemini/settings.json'); put('.codex/config.toml'); put('.agents/skills/x/SKILL.md');
+    put('src/index.js'); put('AGENTS.md'); put('docs/.claude-notes.md'); put('.git/config');
+    const removed = sealAgentConfig(co).sort();
+    assert.deepEqual(removed, ['.agents', '.claude', '.codex', '.mcp.json', '.opencode', 'opencode.json', 'pkg/.gemini', 'pkg/a/opencode.jsonc']);
+    for (const r of removed) assert.equal(existsSync(path.join(co, r)), false, r);
+    for (const kept of ['src/index.js', 'AGENTS.md', 'docs/.claude-notes.md', '.git/config']) assert.equal(existsSync(path.join(co, kept)), true, kept);
+  });
+
   it('refuses to seal when codex cannot list its servers, and reads the system layer', async () => {
     const { codexUserMcpServers, sealCodexCheckout } = await import('../src/engines.js');
     const { mkdtempSync, writeFileSync } = await import('node:fs');

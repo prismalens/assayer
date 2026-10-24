@@ -12,7 +12,7 @@ import { Writable, Readable } from 'node:stream';
 import * as acp from '@agentclientprotocol/sdk';
 import { SessionMapper, readToolLog } from './acp-map.js';
 import { decide, chooseOption } from './policy.js';
-import { ENGINES, engineEnv } from './engines.js';
+import { ENGINES, engineEnv, sealAgentConfig } from './engines.js';
 import { buildManifest } from './manifest.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -119,6 +119,8 @@ export async function runRound(opts, { log = (s) => process.stderr.write(s + '\n
   }
   if (opts.baseSha && opts.headSha) pinInstructionFiles(cwd, opts.baseSha, opts.headSha);
   const source = Object.fromEntries(Object.entries(process.env).filter(([k]) => k !== 'GH_TOKEN' && k !== 'GITHUB_TOKEN'));
+  const sealed = sealAgentConfig(cwd);
+  if (sealed.length) log(`assayer-run: removed the pull request's agent config before the engine starts: ${sealed.join(', ')}`);
   row.sealCheckout?.(cwd, source);
   const baseEnv = engineEnv(row, source, opts.credentialEnv ? [opts.credentialEnv] : []);
   // The engine's `gh` is the shim: `pr comment` is recorded, never posted. Story: #184 day one.
