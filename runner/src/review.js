@@ -327,7 +327,7 @@ export function failureLines(s, dir = null) {
   }
   if (s.conclusion === 'timed-out') {
     out.push(s.timed_out_by === 'stalled'
-      ? `  the engine went quiet with a subagent still open until the time limit, most likely waiting on the model's provider; run it again, or pick another model with --model`
+      ? `  the engine went quiet with a subagent still open, most likely waiting on the model's provider; run it again, or pick another model with --model${s.engine === 'opencode' && !s.model ? " (OpenCode's default free model stalls here often)" : ''}`
       : `  the engine went quiet or ran past its time limit (${s.timed_out_by ?? 'timeout'})`);
   }
   if (!out.length && s.conclusion !== 'completed' && !s.refused_size) out.push(`  no reason recorded; the engine's own log is ${path.join('<round dir>', 'engine-stderr.log')}`);
