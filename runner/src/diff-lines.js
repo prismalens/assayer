@@ -4,10 +4,10 @@ import { relative, resolve } from 'node:path';
 // hunk, on the new side (RIGHT) or the old side (LEFT), per file.
 export function hunkRanges(diffText) {
   const files = new Map();
-  let cur = null;
+  let cur = null; let inHunk = false; let right = 0; let left = 0;
   const unquote = (p) => p.replace(/^"(.*)"$/, '$1');
   for (const line of String(diffText).split('\n')) {
-    if (line.startsWith('diff --git ')) { cur = { RIGHT: [], LEFT: [], oldPath: null }; continue; }
+    if (line.startsWith('diff --git ')) { cur = { RIGHT: [], LEFT: [], oldPath: null, text: { RIGHT: [], LEFT: [] } }; inHunk = false; continue; }
     if (!cur) continue;
     if (line.startsWith('--- ')) { const p = unquote(line.slice(4)); cur.oldPath = p === '/dev/null' ? null : p.replace(/^a\//, ''); continue; }
     if (line.startsWith('+++ ')) {
@@ -21,7 +21,14 @@ export function hunkRanges(diffText) {
       const [a, b, c, d] = [h[1], h[2] ?? '1', h[3], h[4] ?? '1'].map(Number);
       if (b > 0) cur.LEFT.push([a, a + b - 1]);
       if (d > 0) cur.RIGHT.push([c, c + d - 1]);
+      inHunk = true; left = a; right = c;
+      continue;
     }
+    if (!inHunk || line.startsWith('\\')) continue;
+    const mark = line[0]; const text = line.slice(1);
+    if (mark === ' ') { cur.text.LEFT.push([left++, text]); cur.text.RIGHT.push([right++, text]); }
+    else if (mark === '+') cur.text.RIGHT.push([right++, text]);
+    else if (mark === '-') cur.text.LEFT.push([left++, text]);
   }
   return files;
 }
@@ -46,4 +53,15 @@ export function anchorProblem(files, { path: raw, line, startLine, side = 'RIGHT
     return `line ${bad[0]} of ${path} is outside the diff on the ${side} side; the diff's ${side} lines are ${where}.`;
   }
   return null;
+}
+
+// The diff's own numbered lines for one file and side, nearest the line asked for first, so a
+// model that miscounted a hunk can pick the right one (assayer 0.0.2 walk: 12 and 17 in a
+// 10-line file).
+export function numberedLines(files, path, side = 'RIGHT', near = null, max = 40) {
+  const rows = files.get(path)?.text?.[side] ?? [];
+  const keep = Number.isInteger(near) && rows.length > max
+    ? new Set([...rows].sort((x, y) => Math.abs(x[0] - near) - Math.abs(y[0] - near)).slice(0, max).map((r) => r[0]))
+    : null;
+  return rows.filter(([n]) => !keep || keep.has(n)).slice(0, max).map(([n, t]) => `${n}: ${t.slice(0, 160)}`).join('\n');
 }

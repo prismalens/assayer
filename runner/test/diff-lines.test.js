@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { anchorProblem, hunkRanges } from '../src/diff-lines.js';
+import { anchorProblem, hunkRanges, numberedLines } from '../src/diff-lines.js';
 
 const DIFF = `diff --git a/src/a.ts b/src/a.ts
 --- a/src/a.ts
@@ -53,5 +53,16 @@ describe('paths and ranges the way the poster and GitHub read them', () => {
     assert.equal(anchorProblem(files, { path: './src/a.ts', line: 210 }), null);
     assert.equal(anchorProblem(files, { path: '/co/src/a.ts', line: 210 }, '/co'), null);
     assert.match(anchorProblem(files, { path: 'src/a.ts', startLine: 8, line: 210 }), /span two hunks.*\(202-241\)/);
+  });
+});
+
+describe('the numbered lines a misplaced finding is shown', () => {
+  it('numbers each side as GitHub does, and keeps the lines nearest the one asked for', () => {
+    const files = hunkRanges(DIFF);
+    assert.equal(numberedLines(files, 'src/a.ts', 'RIGHT'), '6: x\n7: y\n202: z');
+    assert.equal(numberedLines(files, 'src/a.ts', 'LEFT'), '6: x\n200: z');
+    assert.equal(numberedLines(files, 'old.txt', 'LEFT'), '1: gone');
+    assert.equal(numberedLines(files, 'src/a.ts', 'RIGHT', 201, 1), '202: z');
+    assert.equal(numberedLines(files, 'missing.ts'), '');
   });
 });

@@ -47,7 +47,7 @@ Examples:
   ${SELF} review owner/repo#123 --post      post them inline on the pull request, as you
   ${SELF} review                            review your uncommitted work before you push
   ${SELF} doctor                            check what this machine has for a round
-  ${SELF} config set engine claude-code     change your default engine (codex, claude-code, opencode)
+  ${SELF} config set engine claude-code     set the engine every review uses (codex, claude-code, opencode)
 
 The first review asks which engine to use and can install it. Rounds are kept in ~/.assayer/reviews.
 Docs: https://github.com/prismalens/assayer#readme`;
@@ -327,14 +327,14 @@ export function failureLines(s, dir = null) {
   }
   if (s.conclusion === 'timed-out') {
     out.push(s.timed_out_by === 'stalled'
-      ? `  the engine went quiet with a subagent still open until the time limit, most likely waiting on the model's provider; run it again, or pick another model with --model`
+      ? `  the engine went quiet with a subagent still open, most likely waiting on the model's provider; run it again, or pick another model with --model${s.engine === 'opencode' && !s.model ? " (OpenCode's default free model stalls here often)" : ''}`
       : `  the engine went quiet or ran past its time limit (${s.timed_out_by ?? 'timeout'})`);
   }
   if (!out.length && s.conclusion !== 'completed' && !s.refused_size) out.push(`  no reason recorded; the engine's own log is ${path.join('<round dir>', 'engine-stderr.log')}`);
   return out;
 }
 
-function printRound(dir) {
+function printRound(dir, shown = null) {
   const s = JSON.parse(readFileSync(path.join(dir, 'summary.json'), 'utf8'));
   const { events, findings } = readFindings(dir);
   if (s.conclusion !== 'completed') {
@@ -342,7 +342,8 @@ function printRound(dir) {
     return;
   }
   const lines = [`${s.conclusion}: ${s.findings ?? 0} finding(s) in ${Math.round((s.wall_clock_ms ?? 0) / 1000)}s`];
-  lines.push(...findingLines(findings, { tty: Boolean(process.stdout.isTTY) }));
+  // The live view already printed each finding on this terminal; listing them again doubled them.
+  if (!(process.stdout.isTTY && shown === findings.length)) lines.push(...findingLines(findings, { tty: Boolean(process.stdout.isTTY) }));
   lines.push(...refusalNote(s));
   const summary = events.findLast((e) => e.type === 'summary');
   if (summary) lines.push('', terminalMarkdown(printable(withoutEngineCredit(summary.body)), Boolean(process.stdout.isTTY)));
@@ -388,10 +389,10 @@ function warnCodexSandbox(engine, log) {
 }
 
 // The live view stops before the round's own closing line, so the two never share a row.
-async function watched(dir, engine, log, run) {
+async function watched(dir, engine, log, run, seen = {}) {
   const view = startProgress(dir, { engine });
   // runRound's own closing tally repeats what printRound says next; anything else it logs stays.
-  try { return await run((s) => { view.stop(); if (!/^assayer-run: [\w-]+ in \d+s, /.test(s)) log(s); }); } finally { view.stop(); }
+  try { return await run((s) => { view.stop(); if (!/^assayer-run: [\w-]+ in \d+s, /.test(s)) log(s); }); } finally { view.stop(); seen.shown = view.shown(); }
 }
 
 // A refusal before any quota is spent; telemetry sends its kind, never the message.
@@ -427,13 +428,14 @@ export async function reviewLocal(o, { log = (s) => process.stderr.write(s + '\n
   indexRound(dir);
   log(`assayer: local changes in ${label}, ${snap.dirty ? 'working tree' : snap.head.slice(0, 7)} vs ${base.sha.slice(0, 7)} from ${base.source}, with ${o.engine}; round in ${tilde(dir)}`);
   warnCodexSandbox(o.engine, log);
+  const seen = {};
   const summary = await watched(dir, o.engine, log, (log) => runRound({
     cwd: checkoutDir, prompt: path.join(dir, 'prompt.md'), out: dir, engine: o.engine, model: o.model, promptHash: prompt.hash,
     stage: true, repo, pr: '0', headSha: snap.head, baseSha: base.sha, mode: 'review', ghToken: '', engineGh: 'offline',
     localFiles: changedFiles(checkoutDir, base.sha, snap.head),
     timeoutMs: (ENGINES[o.engine].timeoutMin ?? 20) * 60 * 1000, idleMs: (ENGINES[o.engine].idleMin ?? 8) * 60 * 1000,
-  }, { log }));
-  printRound(dir);
+  }, { log }), seen);
+  printRound(dir, seen.shown);
   if (summary.conclusion !== 'completed') return { dir, summary, posted: null, blocking: false };
   const { findings } = readFindings(dir);
   const counts = Object.fromEntries(SEVERITIES.map((x) => [x, findings.filter((f) => severityOf(f.body) === x).length]));
@@ -473,12 +475,13 @@ export async function review(o, { log = (s) => process.stderr.write(s + '\n') } 
   const round = { repository: o.repo, pr_number: o.pr, head_sha: headSha, base_sha: baseSha, engine: o.engine, model: o.model, where: 'local' };
   writeFileSync(path.join(dir, 'round.json'), JSON.stringify(round, null, 2) + '\n');
 
+  const seen = {};
   const summary = await watched(dir, o.engine, log, (log) => runRound({
     cwd, prompt: path.join(dir, 'prompt.md'), out: dir, engine: o.engine, model: o.model, promptHash: prompt.hash,
     stage: true, repo: o.repo, pr: String(o.pr), headSha, baseSha, mode: o.full ? 'review-full' : 'review', ghToken: token, engineGh: 'offline',
     timeoutMs: (ENGINES[o.engine].timeoutMin ?? 20) * 60 * 1000, idleMs: (ENGINES[o.engine].idleMin ?? 8) * 60 * 1000,
-  }, { log }));
-  printRound(dir);
+  }, { log }), seen);
+  printRound(dir, seen.shown);
   if (summary.conclusion !== 'completed') return { dir, summary, posted: null };
   // A withheld finding's severity is unknown, so it counts at every level.
   const blocking = atOrAbove(readFindings(dir).findings, o.failOn) + (o.failOn ? withheldCount(summary) : 0);

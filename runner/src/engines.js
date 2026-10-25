@@ -78,6 +78,7 @@ export const ENGINES = Object.freeze({
     envAllow: [...BASE_ENV, 'XDG_DATA_HOME', 'XDG_CACHE_HOME'],
     credentialKinds: ['api-key', 'user-login'],
     admitted: { version: '1.18.30', by: 'prismalens#561' },
+    stallMin: 5,
     // OpenCode Zen's free tier needs no key or login. Of its free, non-deprecated, tool-calling
     // rows in the models.dev catalog on 2026-09-19, Muse Spark 1.3 (2026-09-02, 1M context) is
     // the newest; MiMo V2.5 and Nemotron 3 Ultra stalled on the lane's subagent plan.

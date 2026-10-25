@@ -65,6 +65,8 @@ export function chooseBase(top, { base = null } = {}) {
     const sha = git(top, ['merge-base', 'HEAD', ref], { allowFail: true });
     if (sha) return { sha, source };
   }
+  // On main or master with nothing to compare against, the work in progress is what is new.
+  if (branch === 'main' || branch === 'master') return { sha: git(top, ['rev-parse', 'HEAD']), source: 'HEAD' };
   throw refusal('no_base', 'found no upstream, origin/HEAD, main or master to compare with; pass --base <ref>');
 }
 
