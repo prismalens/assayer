@@ -4,15 +4,16 @@
 // allowlist, and write raw.jsonl (every ACP message), tool-log.jsonl (every comment tool
 // call), events.jsonl (assayer/v1) and summary.json (turns, usage, wall clock) to --out.
 // Exit code: 0 completed, 3 engine error, 4 timed out, 2 usage.
-import { execFileSync, spawn } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync, statSync, lstatSync, copyFileSync, chmodSync, accessSync, constants, realpathSync, rmSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync, statSync, lstatSync, chmodSync, accessSync, constants, realpathSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Writable, Readable } from 'node:stream';
 import * as acp from '@agentclientprotocol/sdk';
 import { SessionMapper, readToolLog } from './acp-map.js';
 import { decide, chooseOption } from './policy.js';
-import { ENGINES, engineEnv } from './engines.js';
+import { killProcessTree, spawnAgent, writeLaunchFiles } from '@prismalens/agent-host';
+import { ENGINES, planRound } from './engines.js';
 import { buildManifest } from './manifest.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -65,6 +66,17 @@ export function whichGh(pathVar) {
   return null;
 }
 
+// ASSAYER_* never reaches the engine (#13), so the round's paths ride in the shim's own wrapper.
+function writeShim(file, vars) {
+  const q = (v) => `'${String(v).replace(/'/g, "'\\''")}'`;
+  const exports = Object.entries(vars).map(([k, v]) => `export ${k}=${q(v)}`).join('\n');
+  writeFileSync(file, `#!/usr/bin/env bash\n${exports}\nexec bash ${q(path.join(HERE, 'gh-shim.sh'))} "$@"\n`);
+  chmodSync(file, 0o755);
+}
+
+// A session's select option for one ACP config category, or null.
+const selectOption = (res, category) => (res?.configOptions ?? []).find((o) => o?.category === category && o.type === 'select') ?? null;
+
 function mcpServer(name, toolLog, diffPath = null) {
   const env = [{ name: 'ASSAYER_TOOL_LOG', value: toolLog }, ...(diffPath ? [{ name: 'ASSAYER_DIFF', value: diffPath }, { name: 'ASSAYER_CHECKOUT', value: path.dirname(diffPath) }] : [])];
   return { name, command: process.execPath, args: [path.join(HERE, 'finding-tools.js'), name], env };
@@ -85,7 +97,6 @@ export async function runRound(opts, { log = (s) => process.stderr.write(s + '\n
   for (const f of [rawPath, toolLog, stderrPath]) writeFileSync(f, ''); // fresh per run, never appended across runs
 
   const row = opts.row ?? ENGINES[opts.engine]; // opts.row: a test points a round at a fake agent
-  if (!opts.model && row.defaultModel) opts.model = row.defaultModel;
 
   // The caller decides what is reviewable, never the agent (#105): the manifest and the diff
   // are written into the checkout before the engine starts, as the Actions lane does. A
@@ -121,28 +132,16 @@ export async function runRound(opts, { log = (s) => process.stderr.write(s + '\n
     const pinned = pinBaseFiles(cwd, opts.baseSha, opts.headSha);
     if (pinned.length) log(`assayer-run: kept the base version of what the pull request changed in: ${pinned.join(', ')}`);
   }
-  const source = Object.fromEntries(Object.entries(process.env).filter(([k]) => k !== 'GH_TOKEN' && k !== 'GITHUB_TOKEN'));
-  row.sealCheckout?.(cwd, source);
-  const baseEnv = engineEnv(row, source, opts.credentialEnv ? [opts.credentialEnv] : []);
   // The engine's `gh` is the shim: `pr comment` is recorded, never posted. Story: #184 day one.
-  const realGh = whichGh(baseEnv.PATH ?? process.env.PATH ?? '');
+  const realGh = whichGh(process.env.PATH ?? '');
   // Offline, gh reads fail closed anyway, so a machine without gh still gets the summary shim.
-  if (!realGh && opts.engineGh !== 'offline') throw new Error('gh is not on PATH; the lane\'s prompt needs it for read commands');
+  if (!realGh && opts.engineGh !== 'offline') throw new Error("gh is not on PATH; the lane's prompt needs it for read commands");
   const binDir = path.join(out, 'bin');
   mkdirSync(binDir, { recursive: true });
-  copyFileSync(path.join(HERE, 'gh-shim.sh'), path.join(binDir, 'gh'));
-  chmodSync(path.join(binDir, 'gh'), 0o755);
-  const env = row.prepare({ model: opts.model, outDir: out, env: {
-    ...baseEnv, PATH: `${binDir}${path.delimiter}${baseEnv.PATH ?? process.env.PATH ?? ''}`,
-    ASSAYER_TOOL_LOG: toolLog, ASSAYER_REAL_GH: realGh ?? 'false',
-    // The shim is a copy in <out>/bin; secret-check.js stays here beside its imports.
-    ASSAYER_SECRET_CHECK: path.join(HERE, 'secret-check.js'),
-    // A local round runs on the operator's own login, which is a broad write token. The
-    // engine gets an empty gh config instead, so its gh reads fail closed.
-    ...(opts.engineGh === 'offline' ? { GH_CONFIG_DIR: path.join(out, 'gh-offline') } : {}),
-  } });
-  if (opts.engineGh === 'offline') mkdirSync(path.join(out, 'gh-offline'), { recursive: true });
-  const child = spawn(row.command, row.args({ cwd, model: opts.model }), { cwd, env, stdio: ['pipe', 'pipe', 'pipe'] });
+  writeShim(path.join(binDir, 'gh'), { ASSAYER_TOOL_LOG: toolLog, ASSAYER_REAL_GH: realGh ?? 'false', ASSAYER_SECRET_CHECK: path.join(HERE, 'secret-check.js') });
+  const plan = planRound(row, { cwd, runDir: path.join(out, 'engine'), model: opts.model, overrides: { PATH: `${binDir}${path.delimiter}${process.env.PATH ?? ''}` } });
+  writeLaunchFiles(plan);
+  const child = spawnAgent(plan);
   child.stderr.on('data', (d) => appendFileSync(stderrPath, d));
   let childExit = null;
   child.on('exit', (code, signal) => { childExit = { code, signal }; });
@@ -187,7 +186,7 @@ export async function runRound(opts, { log = (s) => process.stderr.write(s + '\n
         timedOut = why;
         raw('timeout', { why, sessionId: mapper.sessionId ?? null });
         try { ctx.notify?.(acp.methods.agent.session.cancel, { sessionId: mapper.sessionId }); } catch { /* fall through to kill */ }
-        setTimeout(() => child.kill('SIGKILL'), 5000).unref();
+        setTimeout(() => killProcessTree(child, 'SIGKILL'), 5000).unref();
       };
       // No outside signal tells a slow subagent from one whose provider stalled, so an open one
       // waits for the wall clock, which then names the quiet stall.
@@ -206,17 +205,33 @@ export async function runRound(opts, { log = (s) => process.stderr.write(s + '\n
       if (Array.isArray(init.authMethods) && init.authMethods.length && init._meta?.authenticated === false) {
         throw Object.assign(new Error('agent requires authentication: ' + init.authMethods.map((m) => m.id).join(', ')), { stage: 'initialize' });
       }
-      return ctx.buildSession({ cwd, mcpServers: [], ...(row.sessionMeta ? { _meta: row.sessionMeta } : {}) })
+      return ctx.buildSession({ cwd, mcpServers: [], ...(plan.sessionMeta ? { _meta: plan.sessionMeta } : {}) })
         .withMcpServer(mcpServer('github_inline_comment', toolLog, staged && existsSync(path.join(cwd, '.claude-review.diff')) ? path.join(cwd, '.claude-review.diff') : null))
         .withMcpServer(mcpServer('github_comment', toolLog))
         .withSession(async (session) => {
           mapper.sessionId = session.sessionId;
           raw('session', { sessionId: session.sessionId, response: session.newSessionResponse ?? null });
           mapper.onSession(session.newSessionResponse);
-          if (row.sessionMode) {
-            await ctx.request(acp.methods.agent.session.setMode, { sessionId: session.sessionId, modeId: row.sessionMode })
+          // Read-only review: the level's mode, or no prompt at all (#13).
+          const mode = ['acp-mode', 'acp-config'].includes(plan.level.mechanism) ? plan.level.mode?.id : null;
+          if (mode) {
+            const opt = selectOption(session.newSessionResponse, 'mode');
+            await (opt
+              ? ctx.request(acp.methods.agent.session.setConfigOption, { sessionId: session.sessionId, configId: opt.id, value: mode })
+              : ctx.request(acp.methods.agent.session.setMode, { sessionId: session.sessionId, modeId: mode }))
               .catch((e) => { throw Object.assign(e, { stage: 'session' }); });
-            raw('set_mode', { modeId: row.sessionMode });
+            raw('set_mode', { modeId: mode, via: opt ? 'config-option' : 'set_mode' });
+          }
+          if (plan.modelViaSession) {
+            const opt = selectOption(session.newSessionResponse, 'model');
+            const answer = opt && await ctx.request(acp.methods.agent.session.setConfigOption, { sessionId: session.sessionId, configId: opt.id, value: opts.model })
+              .catch((e) => { throw Object.assign(e, { stage: 'session' }); });
+            const took = selectOption(answer, 'model')?.currentValue ?? (opt ? opts.model : null);
+            raw('set_model', { model: opts.model, took });
+            if (took !== opts.model) {
+              const offered = (opt?.options ?? []).flatMap((o) => o.options ?? [o]).map((o) => o.value).join(', ');
+              throw Object.assign(new Error(opt ? `${opts.engine} would not switch to ${opts.model}; it offered ${offered || 'no models'}` : `${opts.engine} offers no model option, so it cannot take ${opts.model}`), { stage: 'session' });
+            }
           }
           const p = session.prompt(promptText);
           p.catch(() => {}); // surfaced through nextUpdate's stop or thrown below
@@ -236,7 +251,7 @@ export async function runRound(opts, { log = (s) => process.stderr.write(s + '\n
     else mapper.onError(err, err?.stage ?? 'prompt');
   } finally {
     clearTimeout(timer); clearTimeout(idle); clearInterval(stall);
-    if (childExit === null) child.kill('SIGTERM');
+    if (childExit === null) killProcessTree(child, 'SIGTERM');
   }
   if (timedOut) conclusion = 'timed-out';
   else if (childExit && (childExit.spawnError || (childExit.code !== 0 && childExit.code !== null)) && !mapper.errored && mapper.stopReason === null) {
@@ -270,8 +285,8 @@ if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.me
 
 
 // A pull request could rewrite the repository's rules (AGENTS.md, CLAUDE.md) to excuse its own
-// defect, or ship agent config the engine loads at start: opencode imports .opencode/plugin/*.js
-// even under --pure. The owner's config at the base commit stays (prismalens/prismalens#817);
+// defect, or ship agent config the engine loads at start, such as an .opencode/plugin/*.js
+// opencode imports. The owner's config at the base commit stays (prismalens/prismalens#817);
 // what the pull request changed is put back to base, as claude-code-action does (CVE-2026-47751).
 export const BASE_PINNED = /(^|\/)(AGENTS\.md|CLAUDE\.md|CLAUDE\.local\.md|\.mcp\.json|\.claude\.json|opencode\.jsonc?|(\.claude|\.opencode|\.codex|\.agents|\.gemini)\/.*)$/;
 export function pinBaseFiles(cwd, baseSha, headSha) {

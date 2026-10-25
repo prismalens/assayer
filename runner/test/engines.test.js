@@ -1,100 +1,80 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { ENGINES } from '../src/engines.js';
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { ENGINES, codexSandboxModeSet, planRound } from '../src/engines.js';
 
-describe('engine rows', () => {
-  it('Claude Code asks before every gated call and reads only its checkout', () => {
-    const row = ENGINES['claude-code'];
-    assert.equal(row.sessionMode, 'default');
-    assert.deepEqual(row.sessionMeta.claudeCode.options.settingSources, []);
-    assert.equal(row.sessionMeta.claudeCode.options.strictMcpConfig, true, 'no claude.ai connectors in a round');
-    assert.equal(row.sessionMeta.claudeCode.options.settings.permissions.blockReadsOutsideWorkingDirectories, true);
-  });
+const HOST = {
+  PATH: '/bin', HOME: '/h', MY_SETTING: 'kept', CODEX_HOME: '/h/.codex', XDG_CONFIG_HOME: '/h/.config', CLAUDE_CONFIG_DIR: '/h/.claude',
+  GH_TOKEN: 'gho_x', GITHUB_TOKEN: 'ghp_x', GH_ENTERPRISE_TOKEN: 'x', ASSAYER_HOME: '/h/.assayer', ASSAYER_TELEMETRY: 'off',
+};
+const plan = (engine, extra = {}) => planRound(ENGINES[engine], { cwd: '/co', runDir: '/run', hostEnv: HOST, ...extra });
 
-  it('no row lets a GitHub token through', async () => {
-    const { engineEnv } = await import('../src/engines.js');
-    for (const [name, row] of Object.entries(ENGINES)) {
-      const env = engineEnv(row, { PATH: '/bin', GH_TOKEN: 'gho_x', GITHUB_TOKEN: 'ghp_x' });
-      assert.deepEqual(Object.keys(env), ['PATH'], name);
+describe('the launch plan', () => {
+  it('passes the user\'s environment, minus Assayer\'s own secrets and any GitHub credential', () => {
+    for (const engine of Object.keys(ENGINES)) {
+      const { env } = plan(engine);
+      for (const k of ['PATH', 'HOME', 'MY_SETTING', 'CODEX_HOME', 'XDG_CONFIG_HOME', 'CLAUDE_CONFIG_DIR']) assert.equal(env[k], HOST[k], `${engine} ${k}`);
+      for (const k of ['GH_TOKEN', 'GITHUB_TOKEN', 'GH_ENTERPRISE_TOKEN']) assert.equal(env[k], undefined, `${engine} ${k}`);
+      assert.deepEqual(Object.keys(env).filter((k) => k.startsWith('ASSAYER_')), [], engine);
+      assert.equal(env.GH_CONFIG_DIR, path.join('/run', 'gh'));
+      assert.deepEqual([env.GIT_CONFIG_KEY_0, env.GIT_CONFIG_VALUE_0], ['credential.helper', '']);
     }
   });
 
-  it('Codex and OpenCode keep their own controls and set no mode', () => {
-    assert.equal(ENGINES.codex.sessionMode, undefined);
-    assert.equal(ENGINES.opencode.sessionMode, undefined);
+  it('keeps the user\'s own setup: no --pure, no Assayer config, no switched-off MCP servers or plugins', () => {
+    const oc = plan('opencode');
+    assert.equal(oc.args.includes('--pure'), false);
+    for (const k of ['OPENCODE_DISABLE_PROJECT_CONFIG', 'OPENCODE_DISABLE_CLAUDE_CODE']) assert.equal(oc.env[k], undefined, k);
+    for (const content of Object.values(oc.files)) { const cfg = JSON.parse(content); assert.equal(cfg.mcp, undefined); assert.equal(cfg.model, undefined); }
+    const cc = plan('claude-code').sessionMeta.claudeCode.options;
+    assert.deepEqual(cc.settingSources, ['user', 'project', 'local']);
+    assert.equal(cc.strictMcpConfig, undefined);
+    const cx = JSON.parse(plan('codex').env.CODEX_CONFIG);
+    for (const k of ['mcp_servers', 'model_reasoning_effort', 'project_doc_max_bytes', 'model']) assert.equal(cx[k], undefined, k);
+    assert.equal(cx.features.plugins, undefined); assert.equal(cx.features.apps, undefined);
   });
-});
 
-describe('Codex credential paths', () => {
-  it('denies where credentials live and leaves its own sign-in readable', () => {
-    const cfg = JSON.parse(ENGINES.codex.prepare({ env: {} }).CODEX_CONFIG);
-    const fs = cfg.permissions[cfg.default_permissions].filesystem;
+  it('keeps the read boundaries: Codex out of credential paths, Claude Code and OpenCode in the checkout', () => {
+    const cx = JSON.parse(plan('codex').env.CODEX_CONFIG);
+    const fs = cx.permissions[cx.default_permissions].filesystem;
     for (const p of ['~/.config/gh', '~/.ssh', '~/.aws', '~/.claude/.credentials.json']) assert.equal(fs[p], 'deny', p);
     assert.equal(Object.keys(fs).some((p) => p.startsWith('~/.codex')), false);
-    assert.equal(cfg.sandbox_mode, undefined, 'a sandbox_mode would switch Codex back to the legacy settings and drop the profile');
+    assert.equal(cx.sandbox_mode, undefined, 'a sandbox_mode would switch Codex back to the legacy settings and drop the profile');
+    assert.equal(plan('claude-code').sessionMeta.claudeCode.options.settings.permissions.blockReadsOutsideWorkingDirectories, true);
+    const oc = JSON.parse(Object.values(plan('opencode').files)[0]);
+    assert.deepEqual(oc.permission.external_directory, { '*': 'deny' });
+    for (const [name, a] of Object.entries(oc.agent)) assert.deepEqual(a.permission.external_directory, { '*': 'deny' }, name);
+    assert.deepEqual(oc.permission.bash, { '*': 'ask' });
+  });
+
+  it('runs read-only through each engine\'s own mode', () => {
+    assert.equal(plan('codex').level.mode.id, 'read-only');
+    assert.equal(plan('claude-code').level.mode.id, 'default');
+    assert.equal(plan('opencode').level.mechanism, 'opencode-permission');
+  });
+
+  it('sets a model through Claude Code\'s env key, and through the session for the others', () => {
+    const cc = plan('claude-code', { model: 'claude-x' });
+    assert.equal(cc.env.ANTHROPIC_MODEL, 'claude-x'); assert.equal(cc.modelViaSession, false);
+    for (const engine of ['codex', 'opencode']) assert.equal(plan(engine, { model: 'm' }).modelViaSession, true, engine);
+    assert.equal(plan('codex').modelViaSession, false, 'no model asked: the user\'s own');
   });
 });
 
-const tmpHome = async (toml) => {
-  const { mkdtempSync, writeFileSync } = await import('node:fs');
-  const os = (await import('node:os')).default; const path = (await import('node:path')).default;
+const tmpHome = (toml) => {
   const home = mkdtempSync(path.join(os.tmpdir(), 'codex-home-'));
   if (toml !== null) writeFileSync(path.join(home, 'config.toml'), toml);
   return home;
 };
 
 describe('a user sandbox_mode', () => {
-  it('is found however TOML writes the key, top level or in a profile', async () => {
-    const { codexSandboxModeSet } = await import('../src/engines.js');
-    assert.equal(codexSandboxModeSet({ CODEX_HOME: await tmpHome(null) }), null);
-    assert.equal(codexSandboxModeSet({ CODEX_HOME: await tmpHome('model = "x"\n') }), null);
+  it('is found however TOML writes the key, top level or in a profile', () => {
+    assert.equal(codexSandboxModeSet({ CODEX_HOME: tmpHome(null) }), null);
+    assert.equal(codexSandboxModeSet({ CODEX_HOME: tmpHome('model = "x"\n') }), null);
     for (const t of ['sandbox_mode = "read-only"', '"sandbox_mode" = "read-only"', "'sandbox_mode' = 'read-only'", 'model = "x"\n[profiles.fast]\nsandbox_mode = "workspace-write"']) {
-      assert.ok(codexSandboxModeSet({ CODEX_HOME: await tmpHome(t + '\n') }), t);
+      assert.ok(codexSandboxModeSet({ CODEX_HOME: tmpHome(t + '\n') }), t);
     }
-    const cfg = JSON.parse(ENGINES.codex.prepare({ env: {} }).CODEX_CONFIG);
-    assert.equal(cfg.permissions.assayer.filesystem[':workspace_roots'], 'read');
-  });
-});
-
-describe('the user\'s own MCP servers and a pull request\'s engine config', () => {
-  it('finds servers in every TOML form, in profiles, and from codex\'s own list', async () => {
-    const { codexUserMcpServers } = await import('../src/engines.js');
-    const forms = {
-      '[mcp_servers.notion] # workspace\nurl = "x"\n': ['notion'],
-      '[mcp_servers]\nnotion = { url = "https://example.com" }\n': ['notion'],
-      'mcp_servers = { a = { url = "x" } }\n': ['a'],
-      "[mcp_servers.'quoted name']\ncommand = \"y\"\n": ['quoted name'],
-      '[profiles.work.mcp_servers.gh]\ncommand = "z"\n': ['gh'],
-    };
-    for (const [toml, want] of Object.entries(forms)) assert.deepEqual(codexUserMcpServers({ CODEX_HOME: await tmpHome(toml) }, () => []), want, toml);
-    assert.deepEqual(codexUserMcpServers({ CODEX_HOME: await tmpHome(null) }, () => ['from-cli']), ['from-cli']);
-  });
-
-  it('a checkout\'s .codex and .agents are replaced and every server is switched off, quoted names too', async () => {
-    const { sealCodexCheckout } = await import('../src/engines.js');
-    const { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } = await import('node:fs');
-    const os = (await import('node:os')).default; const path = (await import('node:path')).default;
-    const home = await tmpHome("[mcp_servers.notion] # w\nurl = \"x\"\n[mcp_servers.'quoted name']\ncommand = \"y\"\n");
-    const co = mkdtempSync(path.join(os.tmpdir(), 'checkout-'));
-    mkdirSync(path.join(co, '.codex'), { recursive: true });
-    writeFileSync(path.join(co, '.codex', 'config.toml'), 'sandbox_mode = "danger-full-access"\n[mcp_servers.evil]\ncommand = "sh"\n');
-    mkdirSync(path.join(co, '.agents', 'skills', 'x'), { recursive: true });
-    sealCodexCheckout(co, { CODEX_HOME: home }, () => []);
-    const { parse } = await import('smol-toml');
-    const cfg = JSON.parse(JSON.stringify(parse(readFileSync(path.join(co, '.codex', 'config.toml'), 'utf8'))));
-    assert.deepEqual(cfg, { mcp_servers: { notion: { enabled: false }, 'quoted name': { enabled: false } } });
-    assert.equal(existsSync(path.join(co, '.agents')), false);
-    assert.equal(ENGINES.codex.sealCheckout, sealCodexCheckout);
-  });
-
-  it('refuses to seal when codex cannot list its servers, and reads the system layer', async () => {
-    const { codexUserMcpServers, sealCodexCheckout } = await import('../src/engines.js');
-    const { mkdtempSync, writeFileSync } = await import('node:fs');
-    const os = (await import('node:os')).default; const path = (await import('node:path')).default;
-    const empty = await tmpHome(null);
-    assert.throws(() => sealCodexCheckout(mkdtempSync(path.join(os.tmpdir(), 'co-')), { CODEX_HOME: empty, PATH: '' }), /could not list Codex's MCP servers/);
-    const sys = path.join(mkdtempSync(path.join(os.tmpdir(), 'etc-')), 'config.toml');
-    writeFileSync(sys, '[mcp_servers.corp]\nurl = "x"\n');
-    assert.deepEqual(codexUserMcpServers({ CODEX_HOME: await tmpHome(null) }, () => [], sys), ['corp']);
   });
 });

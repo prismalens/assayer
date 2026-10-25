@@ -7,7 +7,7 @@ metadata:
 
 # Assayer review
 
-`assayer review` runs one review round on this machine. The engine (Codex, Claude Code or OpenCode) runs under the user's own sign-in, and the findings post under the user's own `gh` login. Nothing is hosted.
+`assayer review` runs one review round on this machine. The engine (Codex, Claude Code or OpenCode) runs under the user's own sign-in and the user's own harness setup: their settings, skills, plugins and MCP servers load as usual, and the model is theirs unless `--model` names another. The findings post under the user's own `gh` login. Nothing is hosted.
 
 ## 1. Before you run it
 

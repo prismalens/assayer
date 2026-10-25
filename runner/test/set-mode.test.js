@@ -15,7 +15,7 @@ it('a round whose engine refuses Always ask fails closed and never sends the pro
   execFileSync('git', ['init', '-q', repo]);
   writeFileSync(path.join(dir, 'prompt.md'), 'review it');
   process.env.FAKE_AGENT_LOG = path.join(dir, 'prompted.log');
-  const row = { command: process.execPath, args: () => [FAKE], envAllow: ['PATH', 'HOME', 'FAKE_AGENT_LOG'], prepare: ({ env }) => env, sessionMode: 'default' };
+  const row = { agent: 'claude-code', launch: { command: process.execPath, args: [FAKE] } };
   const s = await runRound({ engine: 'fake', row, cwd: repo, prompt: path.join(dir, 'prompt.md'), out: path.join(dir, 'out'), engineGh: 'offline', mode: 'review', stage: false, timeoutMs: 30_000, idleMs: 30_000 }, { log: () => {} });
   assert.equal(s.conclusion, 'failed');
   assert.equal(s.errors[0]?._meta?.stage, 'session');
@@ -28,7 +28,7 @@ it('a subagent that works quietly past the idle clock is not cut off', async () 
   execFileSync('git', ['init', '-q', repo]);
   writeFileSync(path.join(dir, 'prompt.md'), 'review it');
   Object.assign(process.env, { FAKE_AGENT_LOG: path.join(dir, 'prompted.log'), FAKE_AGENT_MODE: 'slow-tool', FAKE_AGENT_WAIT: '4000' });
-  const row = { command: process.execPath, args: () => [FAKE], envAllow: ['PATH', 'HOME', 'FAKE_AGENT_LOG', 'FAKE_AGENT_MODE', 'FAKE_AGENT_WAIT'], prepare: ({ env }) => env };
+  const row = { agent: 'local', launch: { command: process.execPath, args: [FAKE] } };
   try {
     const s = await runRound({ engine: 'fake', row, cwd: repo, prompt: path.join(dir, 'prompt.md'), out: path.join(dir, 'out'), engineGh: 'offline', mode: 'review', stage: false, timeoutMs: 30_000, idleMs: 1500 }, { log: () => {} });
     assert.equal(s.conclusion, 'completed', 'an open tool call was cut off as idle');
@@ -42,7 +42,7 @@ it('a subagent quiet until the wall clock is reported as stalled, not cut early'
   execFileSync('git', ['init', '-q', repo]);
   writeFileSync(path.join(dir, 'prompt.md'), 'review it');
   Object.assign(process.env, { FAKE_AGENT_LOG: path.join(dir, 'prompted.log'), FAKE_AGENT_MODE: 'slow-tool', FAKE_AGENT_WAIT: '20000' });
-  const row = { command: process.execPath, args: () => [FAKE], envAllow: ['PATH', 'HOME', 'FAKE_AGENT_LOG', 'FAKE_AGENT_MODE', 'FAKE_AGENT_WAIT'], prepare: ({ env }) => env };
+  const row = { agent: 'local', launch: { command: process.execPath, args: [FAKE] } };
   try {
     const s = await runRound({ engine: 'fake', row, cwd: repo, prompt: path.join(dir, 'prompt.md'), out: path.join(dir, 'out'), engineGh: 'offline', mode: 'review', stage: false, timeoutMs: 5000, idleMs: 1500 }, { log: () => {} });
     assert.equal(s.conclusion, 'timed-out');
@@ -56,7 +56,7 @@ it('an engine with a stall bound ends a round whose open subagent went quiet, we
   execFileSync('git', ['init', '-q', repo]);
   writeFileSync(path.join(dir, 'prompt.md'), 'review it');
   Object.assign(process.env, { FAKE_AGENT_LOG: path.join(dir, 'prompted.log'), FAKE_AGENT_MODE: 'slow-tool', FAKE_AGENT_WAIT: '20000' });
-  const row = { command: process.execPath, args: () => [FAKE], envAllow: ['PATH', 'HOME', 'FAKE_AGENT_LOG', 'FAKE_AGENT_MODE', 'FAKE_AGENT_WAIT'], prepare: ({ env }) => env, stallMin: 1 / 60 };
+  const row = { agent: 'local', launch: { command: process.execPath, args: [FAKE] }, stallMin: 1 / 60 };
   const t0 = Date.now();
   try {
     const s = await runRound({ engine: 'fake', row, cwd: repo, prompt: path.join(dir, 'prompt.md'), out: path.join(dir, 'out'), engineGh: 'offline', mode: 'review', stage: false, timeoutMs: 15000, idleMs: 1500 }, { log: () => {} });
@@ -73,7 +73,7 @@ it('a busy provider fails the round as api-unavailable, with a retry hint', asyn
   execFileSync('git', ['init', '-q', repo]);
   writeFileSync(path.join(dir, 'prompt.md'), 'review it');
   Object.assign(process.env, { FAKE_AGENT_LOG: path.join(dir, 'prompted.log'), FAKE_AGENT_MODE: 'capacity' });
-  const row = { command: process.execPath, args: () => [FAKE], envAllow: ['PATH', 'HOME', 'FAKE_AGENT_LOG', 'FAKE_AGENT_MODE'], prepare: ({ env }) => env };
+  const row = { agent: 'local', launch: { command: process.execPath, args: [FAKE] } };
   try {
     const s = await runRound({ engine: 'fake', row, cwd: repo, prompt: path.join(dir, 'prompt.md'), out: path.join(dir, 'out'), engineGh: 'offline', mode: 'review', stage: false, timeoutMs: 20_000, idleMs: 10_000 }, { log: () => {} });
     assert.equal(s.conclusion, 'failed');
