@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.0.2](https://github.com/prismalens/assayer/compare/v0.0.1...v0.0.2) (2026-10-25)
+
+
+### Bug Fixes
+
+* findings land on diff lines, stalls end early, the walk runs in CI, and smaller fixes from the 0.0.2 walk ([42a119a](https://github.com/prismalens/assayer/commit/42a119ad2613ee743366c857de2f2785d08f091c))
+* **runner:** a misplaced finding gets the diff's numbered lines to re-file against, and the round lists findings once ([aa96f5c](https://github.com/prismalens/assayer/commit/aa96f5c10364e3ee427ff3bd6ba8e9b3eeba3243))
+* **runner:** agent config a pull request adds or changes goes back to base before the engine starts ([#12](https://github.com/prismalens/assayer/issues/12)) ([40ba0aa](https://github.com/prismalens/assayer/commit/40ba0aacb1a5a2c750055277bfb75300aeb43fa0))
+* **runner:** an OpenCode round whose open subagent goes quiet for 5 minutes ends as stalled ([#10](https://github.com/prismalens/assayer/issues/10)) ([7a8a418](https://github.com/prismalens/assayer/commit/7a8a4189f77aa4661f71e5a6e8128d41854b8dda))
+
 ## 0.0.1 (2026-10-23)
 
 
