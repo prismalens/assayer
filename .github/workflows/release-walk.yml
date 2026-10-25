@@ -58,8 +58,13 @@ jobs:
         with:
           engine: claude-code
           version: 2.1.310
-          adapter-version: 0.89.1
+          adapter-version: 0.81.1
           mock-fixtures: .github/release-walk/aimock.json
+
+      # The action needs an adapter version; removing that adapter makes the round use the one
+      # Assayer ships, so an installed `claude` is all the walk has (#13).
+      - name: Leave only the shipped adapter
+        run: npm rm -g @agentclientprotocol/claude-agent-acp && hash -r && ! command -v claude-agent-acp
 
       - name: Rows with the engine
         env:

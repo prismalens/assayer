@@ -23,7 +23,7 @@ posting, a round that already ran. Nothing is hosted: a round run on your machin
 ```bash
 # once, from a checkout of this repository
 cd runner && npm ci && npm link
-npm i -g @openai/codex@0.162.1 @agentclientprotocol/codex-acp@2.1.1 && codex login
+npm i -g @openai/codex@0.162.1 && codex login
 gh auth login
 
 assayer review prismalens/sreforge#183            # print only
@@ -55,11 +55,10 @@ renders the Codex template instead.
 incremental --range-base A --range-head B] [--path-instructions]` renders it the way the
 workflow's `build-prompt` step does and prints the prompt hash on stderr; `prompt/README.md`
 has the template's provenance and re-sync rule. A file still carrying `@@TOKEN@@` is refused. `--engine` is a row in
-`src/engines.js`; `--model` defaults to the row's `defaultModel`, for OpenCode the newest free
-tool-calling model in the models.dev catalog (`opencode models opencode` lists them; the free
-tier needs no key or login). `--timeout-min` (default 20) bounds the round and `--idle-min` (default 8) cuts an engine that has sent no update for that long; either cancels the session, then kills the engine if it does not stop.
-Under `assayer review` the engine gets no `GH_TOKEN` or `GITHUB_TOKEN` and an empty `GH_CONFIG_DIR`,
-so its `gh` reads fail closed and only Assayer posts.
+`src/engines.js`; with no `--model` the engine runs the model the user configured for it. `--timeout-min` (default 20) bounds the round and `--idle-min` (default 8) cuts an engine that has sent no update for that long; either cancels the session, then kills the engine if it does not stop.
+The engine gets the user's environment minus Assayer's own `ASSAYER_*` settings, with no GitHub
+token, an empty `GH_CONFIG_DIR` and a blank git `credential.helper`, so its `gh` reads fail closed
+and only Assayer posts.
 
 Staging never executes a binary the checkout brought with it: a committed `./actionlint` or
 `node_modules/.bin/*` is skipped and the skip is recorded in the manifest's tool notes, since
@@ -113,26 +112,29 @@ The output directory holds:
   null and the gap is recorded in `_meta`. Stop reasons map to
   `completed`, `truncated`, `refused`, `cancelled`; an error or an engine exit before the stop
   is `failed`; the timeout is `timed-out`.
-- `src/engines.js`: the registry. A row names the binary, its ACP arguments, the environment
-  allowlist it receives (never the runner's whole environment), the credential kinds, and
-  `prepare()`, which writes the engine's per-run config.
+- `src/engines.js`: the engines Assayer offers. The binary, its ACP arguments, its environment
+  and the user's own setup come from `@prismalens/agent-host` (`planLaunch` with
+  `userSetup: "inherit"`, `github: "exclude"`); a row holds only Assayer's facts (install
+  commands, timeouts, prompt template) and its read boundaries.
 
 ## The permission finding, and why the engine config matters
 
 OpenCode 1.18.30 in ACP mode edits files and runs shell commands without a permission request
 unless its own config says `ask`. Verified 2026-09-19: with a bare config, an edit, a delete
-and a redirect into `/tmp` all landed with no `session/request_permission`. With the config
-the registry row writes (`edit: ask`, `bash: ask`, `webfetch`, `websearch` and
-`external_directory: deny`, `continue_loop_on_deny`), every edit and every command comes to
-the runner first, the policy answers, and a refusal does not end the turn. That config, and
-`--pure` with the project's own `opencode.json` disabled, is copied from the prismalens
-registry row that passed prismalens#561.
+and a redirect into `/tmp` all landed with no `session/request_permission`. agent-host's
+supervised level adds a run config over the user's own (`edit`, `bash`, `webfetch` and
+`websearch` set to ask on every built-in agent, `continue_loop_on_deny`), and Assayer denies
+`external_directory` on each of them, so every edit and every command comes to the runner
+first, the policy answers, and a refusal does not end the turn. The user's own config, plugins
+and MCP servers still load.
 
 The ACP policy is therefore a guardrail, not a boundary, as prismalens ADR 0003 says of every
 agent. The runner adds no sandbox of its own: what the engine allows and blocks is the posture.
 
-Codex runs through `@agentclientprotocol/codex-acp` 2.1.1, verified 2026-10-08 on
-`gpt-6.1-sol` with a ChatGPT sign-in. The row starts it in the adapter's `read-only` mode, whose
+Codex runs through `@agentclientprotocol/codex-acp` 2.2.2, which Assayer ships through
+`@prismalens/agent-adapters` (Claude Code likewise through `claude-agent-acp` 0.81.1); an adapter
+the user installed on PATH wins. The behaviour below was verified 2026-10-08 on codex-acp 2.1.1 and
+`gpt-6.1-sol` with a ChatGPT sign-in. The round sets the adapter's Read-only mode (`read-only`) before the prompt; its
 default is a workspace-write mode with an automatic reviewer. Every command runs inside Codex's
 own sandbox, with no writes and no network, and does not ask. A command that needs out asks, and
 the policy answers. Codex's permission request quotes such a script into one word, and the
@@ -140,17 +142,17 @@ summary arrives as `gh pr comment --body "<lines>"`. The policy accepts a multi-
 inside single quotes, or inside double quotes whose only backslashes escape a backtick or `$`. A body
 outside that is refused, and since Codex offers only `cancel` for that request and for every
 edit, a refusal ends the round as `cancelled`, not `completed`. The probe's edit step therefore
-ends its Codex run early. Nothing lands. The row also turns off the user's Codex plugins, web
-search and the checkout's `AGENTS.md`; the sign-in stays in `CODEX_HOME`. Zed's
+ends its Codex run early. Nothing lands. The user's own Codex config, plugins, apps
+and MCP servers load; the row turns off only web search, browser and computer use, and keeps
+the credential deny list. The sign-in stays in `CODEX_HOME`. Zed's
 `@zed-industries/codex-acp` is deprecated: its 0.16.0 core cannot use `gpt-6.1-sol` on a
 ChatGPT sign-in, and its refusal aborts the turn.
 
-Codex reviews from its own template, `prompt/codex.md`, not the lane's. `gpt-6.1-sol` defaults
-to `low` effort and cuts every tool output at 10,000 tokens, a per-model cap that
+Codex reviews from its own template, `prompt/codex.md`, not the lane's. `gpt-6.1-sol` cuts every tool output at 10,000 tokens, a per-model cap that
 `tool_output_token_limit` does not raise. The lane template's six scripted agents and single
 diff file left a 7,000-line pull request two-thirds read with no findings. The Codex template
 asks for every reviewable file, read per file with `git diff <base> <head> -- <path>`, and a
-summary that counts them. The row sets `xhigh` effort and a 90-minute, 15-idle-minute round;
+summary that counts them. The effort is the user's own; the row sets a 90-minute, 15-idle-minute round;
 the round renders the template with the pull request's two commits. The template forbids `;`, `|`,
 `--jq` and fetches because one refusal ends the round. Codex asks for an MCP call with only a
 tool-call id, so the runner merges the request with the streamed `tool_call` that named the

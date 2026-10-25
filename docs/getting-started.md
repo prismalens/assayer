@@ -29,7 +29,7 @@ From a checkout instead: `git clone https://github.com/prismalens/assayer && cd 
 assayer review owner/repo#123
 ```
 
-The first time, Assayer asks which engine to use and saves the answer as your default. If the engine is not installed, it shows the install command and offers to run it, then reminds you to sign in to the engine once.
+The first time, Assayer asks which engine to use and saves the answer as your engine setting. If the engine is not installed, it shows the install command and offers to run it, then reminds you to sign in to the engine once.
 
 The round checks out the pull request's head in a fresh directory, runs the engine over it, and prints the findings. Nothing is posted. While it runs, a terminal shows the elapsed time, the engine's tool calls and each finding as the engine files it. The round is kept under `~/.assayer/reviews/`.
 

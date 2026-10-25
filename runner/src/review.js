@@ -327,7 +327,7 @@ export function failureLines(s, dir = null) {
   }
   if (s.conclusion === 'timed-out') {
     out.push(s.timed_out_by === 'stalled'
-      ? `  the engine went quiet with a subagent still open, most likely waiting on the model's provider; run it again, or pick another model with --model${s.engine === 'opencode' && !s.model ? " (OpenCode's default free model stalls here often)" : ''}`
+      ? `  the engine went quiet with a subagent still open, most likely waiting on the model's provider; run it again, or pick another model with --model${s.engine === 'opencode' && !s.model ? " (OpenCode's free models stall here often)" : ''}`
       : `  the engine went quiet or ran past its time limit (${s.timed_out_by ?? 'timeout'})`);
   }
   if (!out.length && s.conclusion !== 'completed' && !s.refused_size) out.push(`  no reason recorded; the engine's own log is ${path.join('<round dir>', 'engine-stderr.log')}`);
@@ -356,7 +356,7 @@ async function pickEngine() {
   const { select, isCancel } = await import('@clack/prompts');
   // A PATH lookup only: doctor's version probes took seconds before the question appeared.
   const choice = await select({
-    message: 'Which engine should review? This becomes your default.',
+    message: 'Which engine should review? Assayer saves it as your engine setting.',
     options: Object.keys(LABELS).map((id) => ({ value: id, label: LABELS[id], hint: missingFor(id).length ? 'not installed yet; Assayer can set it up' : 'installed' })),
   });
   if (isCancel(choice)) throw Object.assign(new Error('no engine chosen; nothing saved'), { cancelled: true });
