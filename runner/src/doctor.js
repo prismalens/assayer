@@ -4,7 +4,7 @@
 import { spawnSync } from 'node:child_process';
 import { accessSync, constants } from 'node:fs';
 import path from 'node:path';
-import { ENGINES, codexSandboxModeSet, installArgs } from './engines.js';
+import { ENGINES, codexSandboxModeSet, engineLaunch, installArgs } from './engines.js';
 import { SELF } from './settings.js';
 
 const MIN_NODE = 22; // the oldest Node release still supported upstream; CI runs 22 and 24
@@ -41,13 +41,13 @@ export function doctor({ probe = defaultProbe, which = onPath, nodeVersion = pro
 
   const engines = Object.entries(ENGINES).map(([id, row]) => {
     const cli = which(row.cli) ? probe(row.cli, ['--version']) : null;
-    const adapter = row.command === row.cli ? cli?.ok : Boolean(which(row.command));
+    const launch = cli?.ok ? engineLaunch(row, { which }) : null;
     const version = cli?.ok ? firstVersion(cli.out) : null;
-    const ready = Boolean(cli?.ok && adapter);
-    const missing = [...new Set([!cli?.ok && row.cli, !adapter && row.command].filter(Boolean))];
+    const ready = Boolean(launch);
+    const missing = [...new Set([!cli?.ok && row.cli, cli?.ok && !launch && row.command].filter(Boolean))];
     const note = (ready && row.admitted?.version && version && version !== row.admitted.version ? `; tested on ${row.admitted.version}` : '')
       + (ready && id === 'codex' && codexSandboxModeSet() ? '; your sandbox_mode turns off its credential deny list' : '');
-    const fix = [...new Set([!cli?.ok && row.install?.cli, !adapter && row.install?.adapter].filter(Boolean))];
+    const fix = !cli?.ok && row.install?.cli ? [row.install.cli] : [];
     add(`engine ${id}`, ready, ready ? `${row.cli} ${version ?? ''}${note}`.trim() : `missing ${missing.join(' and ')}${fix.length ? `: npm ${installArgs(fix.map((pkg) => ({ pkg }))).join(' ')}` : ''}`, false);
     return ready;
   });

@@ -5,12 +5,12 @@ import { installCommand, missingFor, offerSetup, setupHint } from '../src/setup.
 const has = (...cmds) => (c) => (cmds.includes(c) ? `/bin/${c}` : null);
 
 describe('engine setup', () => {
-  it('names the CLI and the adapter it lacks, with pinned adapter versions', () => {
-    const m = missingFor('claude-code', has('claude'));
-    assert.deepEqual(m.map((x) => x.pkg), ['@agentclientprotocol/claude-agent-acp@0.89.1']);
-    assert.equal(installCommand(missingFor('codex', has())), 'npm i -g @openai/codex @agentclientprotocol/codex-acp@2.1.1');
+  it('names only the engine\'s own CLI: Assayer ships the ACP adapter', () => {
+    assert.deepEqual(missingFor('claude-code', has('claude')), []);
+    assert.deepEqual(missingFor('codex', has('codex')), []);
+    assert.equal(installCommand(missingFor('codex', has())), 'npm i -g @openai/codex');
     assert.deepEqual(missingFor('opencode', has('opencode')), []);
-    assert.match(setupHint('codex', missingFor('codex', has('codex'))), /codex-acp@2\.1\.1\nthen sign in once: run `codex login`\./);
+    assert.match(setupHint('codex', missingFor('codex', has())), /npm i -g @openai\/codex\nthen sign in once: run `codex login`\./);
   });
 
   it('runs nothing when the user declines, and reports a failed install', async () => {
@@ -37,7 +37,7 @@ describe('engine setup', () => {
 describe('npm install scripts', () => {
   it('allows Claude Code its postinstall, and nothing else', async () => {
     const { installArgs } = await import('../src/setup.js');
-    assert.deepEqual(installArgs(missingFor('claude-code', has())), ['i', '-g', '@anthropic-ai/claude-code', '@agentclientprotocol/claude-agent-acp@0.89.1', '--allow-scripts=@anthropic-ai/claude-code']);
-    assert.deepEqual(installArgs(missingFor('codex', has())), ['i', '-g', '@openai/codex', '@agentclientprotocol/codex-acp@2.1.1']);
+    assert.deepEqual(installArgs(missingFor('claude-code', has())), ['i', '-g', '@anthropic-ai/claude-code', '--allow-scripts=@anthropic-ai/claude-code']);
+    assert.deepEqual(installArgs(missingFor('codex', has())), ['i', '-g', '@openai/codex']);
   });
 });

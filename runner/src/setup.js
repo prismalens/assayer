@@ -10,8 +10,8 @@ export const LABELS = { codex: 'Codex', 'claude-code': 'Claude Code', opencode: 
 export function missingFor(engine, which = onPath) {
   const row = ENGINES[engine];
   const out = [];
+  // Assayer ships the ACP adapter, so the engine's own CLI is all a user installs (#13).
   if (!which(row.cli)) out.push({ what: `the ${row.cli} CLI`, pkg: row.install.cli });
-  if (row.command !== row.cli && !which(row.command)) out.push({ what: `its ACP adapter ${row.command}`, pkg: row.install.adapter });
   return out;
 }
 

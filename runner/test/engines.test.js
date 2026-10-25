@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { ENGINES, codexSandboxModeSet, planRound } from '../src/engines.js';
+import { ENGINES, codexSandboxModeSet, engineLaunch, planRound } from '../src/engines.js';
 
 const HOST = {
   PATH: '/bin', HOME: '/h', MY_SETTING: 'kept', CODEX_HOME: '/h/.codex', XDG_CONFIG_HOME: '/h/.config', CLAUDE_CONFIG_DIR: '/h/.claude',
@@ -60,6 +60,26 @@ describe('the launch plan', () => {
     assert.equal(cc.env.ANTHROPIC_MODEL, 'claude-x'); assert.equal(cc.modelViaSession, false);
     for (const engine of ['codex', 'opencode']) assert.equal(plan(engine, { model: 'm' }).modelViaSession, true, engine);
     assert.equal(plan('codex').modelViaSession, false, 'no model asked: the user\'s own');
+  });
+});
+
+describe('which adapter starts the engine', () => {
+  const has = (...cmds) => (c) => (cmds.includes(c) ? `/bin/${c}` : null);
+  it('the user\'s own adapter on PATH wins, else the shipped one drives the user\'s own CLI', () => {
+    assert.deepEqual(engineLaunch(ENGINES.codex, { which: has('codex', 'codex-acp') }), { command: 'codex-acp', args: [] });
+    for (const [engine, cli, pkg] of [['codex', 'codex', 'codex-acp'], ['claude-code', 'claude', 'claude-agent-acp']]) {
+      const l = engineLaunch(ENGINES[engine], { which: has(cli) });
+      assert.equal(l.command, process.execPath, engine);
+      assert.match(l.args[0], new RegExp(`@agentclientprotocol[\\\\/]${pkg}[\\\\/]`), engine);
+      assert.equal(engineLaunch(ENGINES[engine], { which: has() }), null, `${engine} without its CLI`);
+    }
+    assert.deepEqual(engineLaunch(ENGINES.opencode, { which: has('opencode') }), { command: 'opencode', args: [] });
+  });
+
+  it('ships the pinned adapters', async () => {
+    const { shippedVersion } = await import('@prismalens/agent-adapters');
+    assert.equal(shippedVersion('@agentclientprotocol/codex-acp'), '2.2.2');
+    assert.equal(shippedVersion('@agentclientprotocol/claude-agent-acp'), '0.81.1');
   });
 });
 

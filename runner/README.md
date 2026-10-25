@@ -23,7 +23,7 @@ posting, a round that already ran. Nothing is hosted: a round run on your machin
 ```bash
 # once, from a checkout of this repository
 cd runner && npm ci && npm link
-npm i -g @openai/codex@0.162.1 @agentclientprotocol/codex-acp@2.1.1 && codex login
+npm i -g @openai/codex@0.162.1 && codex login
 gh auth login
 
 assayer review prismalens/sreforge#183            # print only
@@ -131,7 +131,9 @@ and MCP servers still load.
 The ACP policy is therefore a guardrail, not a boundary, as prismalens ADR 0003 says of every
 agent. The runner adds no sandbox of its own: what the engine allows and blocks is the posture.
 
-Codex runs through `@agentclientprotocol/codex-acp` 2.1.1, verified 2026-10-08 on
+Codex runs through `@agentclientprotocol/codex-acp` 2.2.2, which Assayer ships through
+`@prismalens/agent-adapters` (Claude Code likewise through `claude-agent-acp` 0.81.1); an adapter
+the user installed on PATH wins. The behaviour below was verified 2026-10-08 on codex-acp 2.1.1 and
 `gpt-6.1-sol` with a ChatGPT sign-in. The round sets the adapter's Read-only mode (`read-only`) before the prompt; its
 default is a workspace-write mode with an automatic reviewer. Every command runs inside Codex's
 own sandbox, with no writes and no network, and does not ask. A command that needs out asks, and

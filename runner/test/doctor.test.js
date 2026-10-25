@@ -15,15 +15,15 @@ function machine(installed, { signedIn = true } = {}) {
 
 describe('doctor', () => {
   it('is ready with the tools, a GitHub sign-in and one whole engine', () => {
-    const d = doctor(machine(['git', 'python3', 'gh', 'codex', 'codex-acp']));
-    assert.equal(d.ok, true);
+    const d = doctor(machine(['git', 'python3', 'gh', 'codex']));
+    assert.equal(d.ok, true, 'the shipped adapter drives the user\'s own codex');
     assert.equal(d.checks.find((c) => c.name === 'engine codex').detail, 'codex 0.162.1');
-    assert.match(d.checks.find((c) => c.name === 'engine claude-code').detail, /missing claude and claude-agent-acp/);
+    assert.equal(d.checks.find((c) => c.name === 'engine claude-code').detail, 'missing claude: npm i -g @anthropic-ai/claude-code --allow-scripts=@anthropic-ai/claude-code');
     assert.match(formatDoctor(d), /ready: (npx @prismalens\/)?assayer review can run here/);
   });
 
-  it('is not ready without an adapter, without gh sign-in, or on an old Node', () => {
-    assert.equal(doctor(machine(['git', 'python3', 'gh', 'codex'])).ok, false);
+  it('is not ready without the engine\'s CLI, without gh sign-in, or on an old Node', () => {
+    assert.equal(doctor(machine(['git', 'python3', 'gh', 'codex-acp'])).ok, false);
     assert.equal(doctor(machine(['git', 'python3', 'gh', 'opencode'], { signedIn: false })).ok, false);
     assert.equal(doctor({ ...machine(['git', 'python3', 'gh', 'opencode']), nodeVersion: '20.19.0' }).ok, false);
     assert.equal(doctor({ ...machine(['git', 'python3', 'gh', 'opencode']), nodeVersion: '22.11.0' }).ok, true);

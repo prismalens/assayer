@@ -5,6 +5,7 @@ import { parse as parseToml } from 'smol-toml';
 import os from 'node:os';
 import path from 'node:path';
 import { AGENT_REGISTRY, detectAgent, mergeConfigPatch, planLaunch } from '@prismalens/agent-host';
+import { shippedAdapter } from '@prismalens/agent-adapters';
 
 // The engine gets the user's own environment and setup, minus Assayer's own secrets and any
 // GitHub credential (prismalens#817 ruling, 2026-10-25).
@@ -49,7 +50,7 @@ export const ENGINES = Object.freeze({
   codex: {
     agent: 'codex',
     ...binaries('codex'),
-    install: { cli: '@openai/codex', adapter: '@agentclientprotocol/codex-acp@2.1.1', signIn: 'run `codex login`' },
+    install: { cli: '@openai/codex', signIn: 'run `codex login`' },
     admitted: null,
     // Sol caps each tool output at 10k tokens; the Codex template reads the diff per file
     // instead of the lane's six scripted agents (#184 comment 6096062849).
@@ -67,7 +68,7 @@ export const ENGINES = Object.freeze({
   'claude-code': {
     agent: 'claude-code',
     ...binaries('claude-code'),
-    install: { cli: '@anthropic-ai/claude-code', adapter: '@agentclientprotocol/claude-agent-acp@0.89.1', signIn: 'run `claude` and type `/login`' },
+    install: { cli: '@anthropic-ai/claude-code', signIn: 'run `claude` and type `/login`' },
     admitted: null, // prismalens#639 passes the gate; no admission record in this repo yet
     // A boundary over the user's settings: no reads outside the checkout.
     sessionMeta: { claudeCode: { options: { settings: { permissions: { blockReadsOutsideWorkingDirectories: true } } } } },
@@ -86,11 +87,21 @@ function denyOutsideReads(files) {
   }));
 }
 
+// The user's own adapter on PATH wins, else the one Assayer ships once the agent's CLI is on PATH,
+// as PrismaLens's harnessLaunch does (#13). `which` lets doctor and setup ask without spawning.
+export function engineLaunch(row, { pathEnv = process.env.PATH, which = null } = {}) {
+  const d = AGENT_REGISTRY[row.agent];
+  if (!which) return detectAgent(row.agent, { pathEnv, shippedAdapter }, d);
+  if (which(d.binary)) return { command: d.binary, args: [] };
+  const script = d.adapterPackage && d.companionBinary && which(d.companionBinary) ? shippedAdapter(d.adapterPackage) : null;
+  return script ? { command: process.execPath, args: [script], shipped: true } : null;
+}
+
 // One round's launch plan. `row.launch` and `row.descriptor` let a test start a fake agent.
 // A model goes in the row's env key when it has one, else through the session's model option.
 export function planRound(row, { cwd, runDir, hostEnv = process.env, model = null, overrides = {} }) {
   const descriptor = row.descriptor ?? AGENT_REGISTRY[row.agent];
-  const launch = row.launch ?? detectAgent(row.agent, { pathEnv: hostEnv.PATH }, descriptor) ?? { command: row.command };
+  const launch = row.launch ?? engineLaunch(row, { pathEnv: hostEnv.PATH }) ?? { command: row.command };
   const modelEnv = model && descriptor.envModelKey ? { [descriptor.envModelKey]: model } : {};
   const plan = planLaunch({
     agent: row.agent, level: 'supervised', policy: LAUNCH_POLICY, launch, cwd, runDir, hostEnv, descriptor,

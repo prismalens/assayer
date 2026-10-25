@@ -26,11 +26,12 @@ case "${1:-}" in
   engine)
     assayer doctor > doctor.txt || { cat doctor.txt; fail "doctor with Claude Code installed is not ready"; }
     row "Doctor, Claude Code" "exit 0: $(tail -1 doctor.txt)"
+    if command -v claude-agent-acp > /dev/null; then fail "claude-agent-acp is on PATH; the walk must use the shipped adapter"; fi
     bash "$here/sandbox.sh" "$RUNNER_TEMP/sandbox"
     (cd "$RUNNER_TEMP/sandbox" && assayer review --engine claude-code) > review.txt 2>&1 || { cat review.txt; fail "the local round failed"; }
     cat review.txt
     grep -q 'completed: 1 finding(s)' review.txt && grep -q 'coupon.js:3' review.txt || fail "the round did not report the scripted finding at coupon.js:3"
-    row Review "local round on \`main\` with uncommitted work: $(grep -m1 'completed:' review.txt), \`coupon.js:3\`"
+    row Review "local round on \`main\` with uncommitted work, shipped adapter: $(grep -m1 'completed:' review.txt), \`coupon.js:3\`"
     assayer telemetry status > telemetry.txt
     cat telemetry.txt
     grep -q 'forced by ASSAYER_TELEMETRY, DO_NOT_TRACK or CI' telemetry.txt || fail "telemetry is not forced off in CI"

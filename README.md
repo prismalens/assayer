@@ -78,11 +78,11 @@ It refuses before spending any quota when the pull request is closed, carries th
 
 | Engine | Install | Sign-in |
 | --- | --- | --- |
-| Codex | `npm i -g @openai/codex @agentclientprotocol/codex-acp@2.1.1` | `codex login`, or `OPENAI_API_KEY` |
-| Claude Code | `npm i -g @anthropic-ai/claude-code @agentclientprotocol/claude-agent-acp@0.89.1 --allow-scripts=@anthropic-ai/claude-code` | run `claude` and type `/login`, or `ANTHROPIC_API_KEY` |
+| Codex | `npm i -g @openai/codex` | `codex login`, or `OPENAI_API_KEY` |
+| Claude Code | `npm i -g @anthropic-ai/claude-code --allow-scripts=@anthropic-ai/claude-code` | run `claude` and type `/login`, or `ANTHROPIC_API_KEY` |
 | OpenCode | `npm i -g opencode-ai@1.18.30 --allow-scripts=opencode-ai` | none needed for its free models, though they often stall mid-round; pick one with `--model` |
 
-Use whichever sign-in your plan offers. Each provider's own terms apply: [OpenAI](https://openai.com/policies/), [Anthropic](https://www.anthropic.com/legal), [OpenCode](https://opencode.ai). `assayer doctor` shows which engines are ready on this machine.
+Assayer ships the ACP adapters for Codex (`@agentclientprotocol/codex-acp` 2.2.2) and Claude Code (`@agentclientprotocol/claude-agent-acp` 0.81.1), so the engine's own CLI is all you install; an adapter you installed yourself on PATH is used instead. Use whichever sign-in your plan offers. Each provider's own terms apply: [OpenAI](https://openai.com/policies/), [Anthropic](https://www.anthropic.com/legal), [OpenCode](https://opencode.ai). `assayer doctor` shows which engines are ready on this machine.
 
 A round runs the engine with your own harness setup: its settings, skills, plugins and MCP servers load as they do when you run it yourself, and the model is the one you configured unless `--model` names another. Assayer adds only its boundaries: no GitHub credential, read-only review, and a pull request's own agent config put back to the base branch's version ([how it works](https://github.com/prismalens/assayer/blob/main/docs/how-it-works.md)).
 
